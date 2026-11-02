@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas text-ink antialiased;
+    font-family: theme("fontFamily.sans");
+  }
+
+  /* Numeric columns line up in tables without switching to a mono face. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-water-600 ring-offset-2 ring-offset-surface;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-border bg-surface shadow-card;
+  }
+
+  .field-label {
+    @apply mb-1 block text-sm font-medium text-ink-soft;
+  }
+
+  .field-hint {
+    @apply mt-1 text-xs text-muted;
+  }
+
+  .field-error {
+    @apply mt-1 text-xs text-danger;
+  }
+
+  .input {
+    @apply w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-ink
+      placeholder:text-muted focus:border-water-600 focus:outline-none focus:ring-1
+      focus:ring-water-600 disabled:cursor-not-allowed disabled:bg-canvas;
+  }
+
+  /* 60/30/10: primary actions use the water hue, one accent per screen. */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm
+      font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply btn bg-water-700 text-white hover:bg-water-800;
+  }
+
+  .btn-accent {
+    @apply btn bg-signal-300 text-ink hover:bg-signal-400;
+  }
+
+  .btn-secondary {
+    @apply btn border border-border bg-surface text-ink-soft hover:bg-canvas;
+  }
+
+  .btn-ghost {
+    @apply btn text-water-700 hover:bg-water-50;
+  }
+
+  .btn-danger {
+    @apply btn bg-danger text-white hover:bg-danger-dark;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+
+  .table-head {
+    @apply border-b border-border bg-canvas text-left text-xs font-semibold
+      uppercase tracking-wide text-muted;
+  }
+}
+
+/* Leaflet needs an explicit height and must not inherit the Tailwind reset's
+   image styling, which would otherwise distort map tiles/attribution. */
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  background: #eef2f6;
+  font-family: theme("fontFamily.sans");
+}
+
+.leaflet-container img {
+  max-width: none;
+}
