@@ -1,0 +1,77 @@
+# LakeWatch - full stack: PostgreSQL+PostGIS, FastAPI backend, nginx frontend.
+#
+#   cp backend/.env.example .env          # then set SECRET_KEY
+#   docker compose up --build
+#   open http://localhost:8080            # API docs at http://localhost:8080/docs
+#
+# Create the first administrator once the stack is healthy:
+#   docker compose exec backend python -m app.cli bootstrap-admin \
+#     --email admin@example.org --name "System Administrator"
+#
+# The named volume `storage` holds raw retrievals, processed products and
+# exports and is shared by the backend only (workers run in-process); the
+# database volume `pgdata` persists PostgreSQL.
+
+name: lakewatch
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lakewatch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lakewatch}
+      POSTGRES_DB: ${POSTGRES_DB:-lakewatch}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Exposed for local inspection; remove in production.
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lakewatch} -d ${POSTGRES_DB:-lakewatch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-lakewatch}:${POSTGRES_PASSWORD:-lakewatch}@db:5432/${POSTGRES_DB:-lakewatch}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      # Alembic (run by the entrypoint) owns the schema in production.
+      AUTO_CREATE_TABLES: "false"
+      STARTUP_BOOTSTRAP: "true"
+      STORAGE_ROOT: /data/storage
+      JOBS_ENABLED: "true"
+      JOBS_WORKER_COUNT: ${JOBS_WORKER_COUNT:-2}
+      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      BOOTSTRAP_ADMIN_NAME: ${BOOTSTRAP_ADMIN_NAME:-}
+    volumes:
+      - storage:/data/storage
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  pgdata:
+  storage:
