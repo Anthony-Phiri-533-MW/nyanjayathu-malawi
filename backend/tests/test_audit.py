@@ -66,10 +66,11 @@ def test_audit_list_and_filters(
 
 
 # --------------------------------------------------------------------- permissions
-def test_researcher_can_read_audit(
+def test_researcher_cannot_read_audit(
     client: TestClient, admin_headers: dict[str, str], make_user
 ) -> None:
     _, headers = make_user("audit-researcher@example.org", role="researcher")
-    assert client.get("/api/v1/admin/audit", headers=headers).status_code == 200
-    assert client.get("/api/v1/admin/audit/actions", headers=headers).status_code == 200
-    assert client.get("/api/v1/admin/audit/resource-types", headers=headers).status_code == 200
+    # researchers hold no admin.audit.read permission
+    assert client.get("/api/v1/admin/audit", headers=headers).status_code == 403
+    assert client.get("/api/v1/admin/audit/actions", headers=headers).status_code == 403
+    assert client.get("/api/v1/admin/audit/resource-types", headers=headers).status_code == 403

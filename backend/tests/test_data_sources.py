@@ -14,7 +14,7 @@ def _create_source(
     *,
     name: str = "CHIRPS test source",
     provider_key: str = "chirps",
-    category: str = "climate",
+    category: str = "satellite_rainfall",
     is_enabled: bool = True,
 ) -> dict:
     response = client.post(
@@ -75,8 +75,8 @@ def test_create_list_get_update_delete_data_source(
 def test_data_source_filtering(
     client: TestClient, admin_headers: dict[str, str]
 ) -> None:
-    _create_source(client, admin_headers, name="CHIRPS climate", provider_key="chirps", category="climate")
-    _create_source(client, admin_headers, name="Sentinel2 optical", provider_key="sentinel2_mpc", category="satellite")
+    _create_source(client, admin_headers, name="CHIRPS rainfall", provider_key="chirps", category="satellite_rainfall")
+    _create_source(client, admin_headers, name="Sentinel2 optical", provider_key="sentinel2_mpc", category="sentinel2")
 
     listed = client.get(
         "/api/v1/admin/data-sources",

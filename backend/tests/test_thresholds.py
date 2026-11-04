@@ -178,11 +178,12 @@ def test_threshold_validation(
 
 
 # --------------------------------------------------------------------- permissions
-def test_researcher_can_read_but_not_write_thresholds(
+def test_researcher_cannot_read_or_write_thresholds(
     client: TestClient, admin_headers: dict[str, str], make_user
 ) -> None:
     _, headers = make_user("thresh-researcher@example.org", role="researcher")
-    assert client.get("/api/v1/admin/thresholds", headers=headers).status_code == 200
+    # researchers hold no admin.thresholds.* permissions
+    assert client.get("/api/v1/admin/thresholds", headers=headers).status_code == 403
     assert client.post(
         "/api/v1/admin/thresholds",
         json={
