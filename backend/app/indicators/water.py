@@ -2,9 +2,15 @@
 from __future__ import annotations
 
 from datetime import date
+from math import sqrt
 from typing import Any
 
 import numpy as np
+from pyproj import Transformer
+from rasterio.features import shapes
+from shapely import transform as transform_geometry
+from shapely.geometry import mapping, shape
+from shapely.ops import unary_union
 from sqlalchemy import select
 
 from app.core.errors import UnprocessableError
@@ -26,8 +32,34 @@ from app.indicators.base import (
 from app.models import Dataset, IndicatorResult
 from app.processing import quality as qmod
 from app.processing import water_mask as wm
+from app.processing.io import RasterRead
 
 METHOD_LABEL = {"mndwi": "MNDWI (Xu, 2006)", "ndwi": "NDWI (McFeeters, 1996)"}
+
+
+def _water_extent_geometry(water_mask: np.ndarray, ref: RasterRead) -> dict[str, Any] | None:
+    """Build a simplified WGS84 shoreline polygon from the classified pixels."""
+    if not water_mask.any():
+        return None
+
+    pixel_area_m2 = float(np.nanmedian(pixel_areas(ref)))
+    tolerance_m = max(sqrt(pixel_area_m2) * 0.6, 5.0)
+    to_equal_area = Transformer.from_crs(ref.crs, "EPSG:6933", always_xy=True).transform
+    to_wgs84 = Transformer.from_crs("EPSG:6933", "EPSG:4326", always_xy=True).transform
+    mask = water_mask.astype(np.uint8)
+    polygons = []
+
+    for geometry, _value in shapes(mask, mask=water_mask, transform=ref.transform, connectivity=8):
+        polygon = transform_geometry(shape(geometry), to_equal_area, interleaved=False)
+        simplified = polygon.simplify(tolerance_m, preserve_topology=True)
+        if not simplified.is_empty:
+            polygons.append(simplified)
+
+    if not polygons:
+        return None
+
+    dissolved = transform_geometry(unary_union(polygons), to_wgs84, interleaved=False)
+    return mapping(dissolved)
 
 
 def _dates(ctx: IndicatorContext, timeline) -> tuple[date, date]:
@@ -100,6 +132,7 @@ def compute_water_extent(ctx: IndicatorContext) -> list[IndicatorResult]:
         areas = pixel_areas(ref)
         water_pixels = mask_result.water_mask & valid & inside
         area_km2 = float((water_pixels * areas[:, None]).sum()) / 1_000_000.0
+        extent_geojson = _water_extent_geometry(water_pixels, ref)
         usable = valid & mask_result.valid_mask
         quality = quality_for(valid=usable, inside=inside, cloud_fraction=cloud_fraction)
 
@@ -132,7 +165,7 @@ def compute_water_extent(ctx: IndicatorContext) -> list[IndicatorResult]:
                 dataset=timeline.dataset,
                 provenance=provenance,
                 parameters={"method": mask_result.method, "threshold": mask_result.threshold},
-                extent=timeline.dataset.coverage_geojson,
+                extent=extent_geojson,
             )
         )
     ctx.progress(1.0, "water extent computed")

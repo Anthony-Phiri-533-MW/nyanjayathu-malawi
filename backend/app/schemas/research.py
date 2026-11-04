@@ -276,6 +276,7 @@ class IndicatorResultOut(BaseModel):
     flag_reasons: list | dict | None = None
     coverage_fraction: float | None = None
     missing_fraction: float | None = None
+    spatial_extent_geojson: dict | None = None
     uncertainty: dict | None = None
     provenance: dict | None = None
     parameters: dict | None = None

@@ -23,6 +23,11 @@ water quality. This repository implements five of the planned modules end to end
    disaster alerts. Nothing is public by default: staff with `public.publish`
    explicitly publish datasets, study areas and alerts, every decision is
    audit-logged, and unpublishing takes effect immediately.
+6. **LakeWatch dashboard** — a Malawi map with a Lake Malawi shoreline
+   highlight, automatically refreshed published layers, recorded forecasts,
+   water-extent history and a contextual AI explanation panel. The shoreline
+   time-lapse appears only when dated water-extent polygons have been computed
+   and their source datasets published.
 
 > **Scope note.** Machine Learning, Report Generation, Public Data and
 > Statistics modules are intentionally **not** part of this build. The platform
@@ -180,9 +185,20 @@ are in the root **`.env.example`**.
 | `PLANETARY_COMPUTER_STAC_URL` | MPC STAC | Microsoft Planetary Computer STAC endpoint. |
 | `PLANETARY_COMPUTER_SAS_URL` | MPC SAS | Planetary Computer SAS token endpoint. |
 | `LPDAAC_STAC_URL` | LP DAAC STAC | USGS LP DAAC STAC endpoint. |
+| `AI_BASE_URL` | *(empty)* | Optional OpenAI-compatible chat-completions base URL; blank disables AI. |
+| `AI_MODEL` | *(empty)* | Model name for the dashboard assistant. |
+| `AI_API_KEY` | *(empty)* | Server-side provider key; never sent to the browser. |
+| `AI_TIMEOUT_SECONDS` | `45` | Maximum wait for the assistant provider (1–120 seconds). |
 | `CORS_ORIGINS` | `localhost:5173,127.0.0.1:5173,localhost:8080` | Comma-separated allowed browser origins. |
 
 Compose-only variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`.
+
+The assistant sends only the dashboard summary metrics and the submitted
+question to the configured provider after a user asks a question; it does not
+send raw satellite files or unpublished map layers. For Docker Compose, set
+`AI_BASE_URL`, `AI_MODEL` and (when required) `AI_API_KEY` in the root `.env`.
+The map uses OpenStreetMap tiles and a simplified Lake Malawi shoreline from
+OpenStreetMap; attribution is shown on the map.
 
 ---
 

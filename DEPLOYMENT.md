@@ -37,7 +37,23 @@ BOOTSTRAP_ADMIN_PASSWORD=<min 10 chars>
 BOOTSTRAP_ADMIN_NAME=System Administrator
 
 JOBS_WORKER_COUNT=2
+
+# Optional assistant. Leave blank to disable it.
+# AI_BASE_URL=https://api.openai.com/v1
+# AI_MODEL=<provider model name>
+# AI_API_KEY=<server-side secret>
 ```
+
+The dashboard assistant uses an OpenAI-compatible chat-completions API. The
+backend keeps the provider key server-side. On an explicit user question, it
+sends the question and displayed summary metrics only; raw imagery and
+unpublished map layers are not sent. Leave the settings blank to disable the
+assistant. For a local Ollama service, use
+`AI_BASE_URL=http://host.docker.internal:11434/v1` in Docker Compose.
+
+The Lake Malawi time-lapse is enabled by dated `water_extent` polygons from
+computed satellite scenes whose source datasets have been published. It does
+not fabricate shoreline changes when those polygons are absent.
 
 ### 1.2 Start
 

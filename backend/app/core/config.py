@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     planetary_computer_sas_url: str = "https://planetarycomputer.microsoft.com/api/sas/v1"
     lpdaac_stac_url: str = "https://data.lpdaac.earthdatacloud.nasa.gov/stac/LPCLOUD"
 
+    # --- dashboard assistant (OpenAI-compatible chat completions API) -----
+    ai_base_url: str | None = None
+    ai_model: str | None = None
+    ai_api_key: str | None = None
+    ai_timeout_seconds: float = Field(default=45.0, gt=0, le=120)
+
     # ``NoDecode`` stops pydantic-settings from JSON-decoding the raw env value
     # so the comma-separated form below reaches the validator untouched.
     cors_origins: Annotated[list[str], NoDecode] = [

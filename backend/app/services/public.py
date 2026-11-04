@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import count_query
 from app.core.errors import NotFoundError
-from app.models import Alert, Dataset, StudyArea, User, utcnow  # noqa: F401  (utcnow re-exported)
+from app.models import Alert, Dataset, IndicatorResult, StudyArea, User, utcnow  # noqa: F401  (utcnow re-exported)
 from app.schemas.public import PublicOverviewAlertTotals
 
 _PROVENANCE = (
@@ -110,6 +110,35 @@ def list_public_alerts(
     return rows, total
 
 
+def list_public_water_extents(
+    db: Session, *, page: int = 1, size: int = 100
+) -> tuple[list[tuple[IndicatorResult, Dataset]], int]:
+    filters = (
+        IndicatorResult.indicator_key == "water_extent",
+        IndicatorResult.value.is_not(None),
+        IndicatorResult.spatial_extent_geojson.is_not(None),
+        Dataset.is_public.is_(True),
+    )
+    total = int(
+        db.execute(
+            select(func.count(IndicatorResult.id))
+            .join(Dataset, Dataset.id == IndicatorResult.dataset_id)
+            .where(*filters)
+        ).scalar_one()
+    )
+    rows = list(
+        db.execute(
+            select(IndicatorResult, Dataset)
+            .join(Dataset, Dataset.id == IndicatorResult.dataset_id)
+            .where(*filters)
+            .order_by(IndicatorResult.observed_start.asc(), IndicatorResult.id.asc())
+            .offset((page - 1) * size)
+            .limit(size)
+        ).all()
+    )
+    return rows, total
+
+
 def public_map(db: Session) -> dict[str, Any]:
     """GeoJSON FeatureCollection of *public* study areas.
 
@@ -164,9 +193,32 @@ def public_map(db: Session) -> dict[str, Any]:
                 },
             }
         )
+    dataset_coverages = list(
+        db.execute(
+            select(Dataset)
+            .where(Dataset.is_public.is_(True), Dataset.coverage_geojson.is_not(None))
+            .order_by(Dataset.created_at.desc(), Dataset.id.desc())
+        ).scalars()
+    )
     return {
         "type": "FeatureCollection",
         "features": features,
+        "dataset_coverages": [
+            {
+                "type": "Feature",
+                "id": dataset.id,
+                "geometry": dataset.coverage_geojson,
+                "properties": {
+                    "id": dataset.id,
+                    "title": dataset.title,
+                    "is_raw": dataset.is_raw,
+                    "quality_flag": dataset.quality_flag,
+                    "start_date": dataset.start_date,
+                    "end_date": dataset.end_date,
+                },
+            }
+            for dataset in dataset_coverages
+        ],
         "generated_at": datetime.now(UTC),
         "provenance": _PROVENANCE,
     }

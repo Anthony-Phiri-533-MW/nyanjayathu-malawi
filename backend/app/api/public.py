@@ -15,11 +15,22 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.serializers import page_response, public_alert_out, public_dataset_out
+from app.api.serializers import (
+    page_response,
+    public_alert_out,
+    public_dataset_out,
+    public_water_extent_out,
+)
 from app.core.database import get_db
 from app.core.deps import CurrentUser, require_permissions
 from app.schemas.common import Page
-from app.schemas.public import PublicAlertOut, PublicDatasetOut, PublicOverviewOut, PublishFlag
+from app.schemas.public import (
+    PublicAlertOut,
+    PublicDatasetOut,
+    PublicOverviewOut,
+    PublicWaterExtentOut,
+    PublishFlag,
+)
 from app.services import audit as audit_service
 from app.services import public as service
 
@@ -58,9 +69,24 @@ def public_alerts(
     return page_response([public_alert_out(a) for a in rows], total, page, size)
 
 
+@router.get("/water-extents", response_model=Page[PublicWaterExtentOut])
+def public_water_extents(
+    db: Annotated[Session, Depends(get_db)],
+    page: int = Query(1, ge=1),
+    size: int = Query(100, ge=1, le=200),
+) -> Page[PublicWaterExtentOut]:
+    rows, total = service.list_public_water_extents(db, page=page, size=size)
+    return page_response(
+        [public_water_extent_out(result, dataset) for result, dataset in rows],
+        total,
+        page,
+        size,
+    )
+
+
 @router.get("/map")
 def public_map(db: Annotated[Session, Depends(get_db)]) -> dict:
-    """GeoJSON FeatureCollection of public study areas (anonymous)."""
+    """Published study areas and dataset coverages as GeoJSON (anonymous)."""
     return service.public_map(db)
 
 

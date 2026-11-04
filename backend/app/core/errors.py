@@ -50,6 +50,16 @@ class ConflictError(AppError):
     code = "conflict"
 
 
+class ServiceUnavailableError(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    code = "service_unavailable"
+
+
+class UpstreamServiceError(AppError):
+    status_code = status.HTTP_502_BAD_GATEWAY
+    code = "upstream_service_error"
+
+
 class UnprocessableError(AppError):
     status_code = 422
     code = "unprocessable"

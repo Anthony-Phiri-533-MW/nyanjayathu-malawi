@@ -68,6 +68,20 @@ class PublicAlertOut(BaseModel):
     study_area_name: str | None = None
 
 
+class PublicWaterExtentOut(BaseModel):
+    """Mapped water extent tied to a dataset the team has published."""
+
+    id: int
+    dataset_id: int
+    dataset_title: str
+    observed_start: date
+    observed_end: date
+    value: float
+    unit: str
+    quality_flag: str
+    spatial_extent_geojson: dict
+
+
 class PublicOverviewAlertTotals(BaseModel):
     by_severity: dict[str, int] = {}
     by_kind: dict[str, int] = {}

@@ -23,7 +23,7 @@ from app.schemas.disaster import (
     AlertResponseOut,
     ForecastOut,
 )
-from app.schemas.public import PublicAlertOut, PublicDatasetOut
+from app.schemas.public import PublicAlertOut, PublicDatasetOut, PublicWaterExtentOut
 from app.schemas.report import ReportOut
 from app.schemas.research import (
     BandOut,
@@ -259,6 +259,7 @@ def indicator_result_out(
         flag_reasons=row.flag_reasons_json,
         coverage_fraction=row.coverage_fraction,
         missing_fraction=row.missing_fraction,
+        spatial_extent_geojson=row.spatial_extent_geojson,
         uncertainty=row.uncertainty_json,
         provenance=row.provenance_json,
         parameters=row.parameters_json,
@@ -528,4 +529,18 @@ def public_alert_out(alert) -> PublicAlertOut:
         last_evaluated_at=alert.last_evaluated_at,
         study_area_id=alert.study_area_id,
         study_area_name=public_area_name(alert.study_area),
+    )
+
+
+def public_water_extent_out(row, dataset) -> PublicWaterExtentOut:
+    return PublicWaterExtentOut(
+        id=row.id,
+        dataset_id=dataset.id,
+        dataset_title=dataset.title,
+        observed_start=row.observed_start,
+        observed_end=row.observed_end,
+        value=row.value,
+        unit=row.unit,
+        quality_flag=row.quality_flag,
+        spatial_extent_geojson=row.spatial_extent_geojson,
     )
