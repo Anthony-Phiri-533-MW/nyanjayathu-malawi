@@ -1,0 +1,6 @@
+# Cloudflare Pages SPA fallback.
+#
+# Vite emits a single-page app; routes such as /public, /research/analysis and
+# /admin/users only exist client-side.  Cloudflare Pages serves matching static
+# files first, so /assets/* keeps its long-lived cache headers.
+/*    /index.html    200

@@ -72,6 +72,24 @@ class Settings(BaseSettings):
         "http://localhost:8080",
     ]
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def _normalise_database_url(cls, v: object) -> object:
+        """Accept the connection strings managed platforms inject.
+
+        Render, Railway and Heroku hand out ``postgres://`` or
+        ``postgresql://`` URLs, while this project ships psycopg 3 (dialect
+        ``postgresql+psycopg``).  Rewriting here means the same ``DATABASE_URL``
+        variable works locally, in Docker Compose and on those platforms.
+        """
+        if not isinstance(v, str):
+            return v
+        if v.startswith("postgres://"):
+            return "postgresql+psycopg://" + v[len("postgres://") :]
+        if v.startswith("postgresql://"):
+            return "postgresql+psycopg://" + v[len("postgresql://") :]
+        return v
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, v: object) -> object:

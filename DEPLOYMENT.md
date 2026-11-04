@@ -1,13 +1,17 @@
 # LakeWatch — Deployment Guide
 
 This is a **monorepo**: `backend/` (FastAPI + SQLAlchemy + Alembic) and
-`frontend/` (React + Vite) live in one Git repository and are deployed
-together. Two supported paths:
+`frontend/` (React + Vite) live in one Git repository. Three supported paths:
 
 | Path | Use when | Time to first admin login |
 | --- | --- | --- |
-| **Docker Compose** (recommended) | you have Docker 24+ and docker compose v2 | ~5 minutes |
+| **Docker Compose** (recommended for a single host) | you have Docker 24+ and docker compose v2 | ~5 minutes |
 | **Manual** (venv + build + reverse proxy) | bare server / no Docker | ~20 minutes |
+| **Split hosting** (Cloudflare Pages + Render/Railway) | separate managed platforms for each app | ~15 minutes |
+
+Sections 1–2 deploy both apps together on one origin, so no CORS is involved.
+Section 5 covers the split deployment, where the frontend and backend have
+different origins and the backend must allow the frontend's origin.
 
 ---
 
@@ -224,3 +228,179 @@ And in the UI: sign in as admin → publish one dataset and one alert from
 their detail pages → open `/public` in a private window (not signed in) →
 confirm the items appear and `study_area.name` stays hidden until the area
 itself is published.
+
+---
+
+## 5. Split deployment: Cloudflare Pages (frontend) + Render/Railway (backend)
+
+The monorepo stays one repository; each platform builds only the directory it
+needs. This is the same code as the single-host setup, with three differences:
+a **build-time API URL**, **CORS**, and **persistent storage**.
+
+### 5.1 How the split is wired
+
+| Concern | Where it is configured |
+| --- | --- |
+| Frontend build | Cloudflare Pages, **root directory `frontend`** |
+| API URL baked into the bundle | `VITE_API_BASE_URL` in the Pages environment |
+| Backend image | `backend/Dockerfile`, built with the **repo root** as context |
+| Database | Render Postgres / Railway Postgres |
+| Allowed browser origin | `CORS_ORIGINS` on the backend |
+| SPA deep links | `frontend/public/_redirects` (Vite copies it into `dist/`) |
+| Platform port | `backend/Dockerfile` binds `${PORT:-8000}` |
+
+Authentication uses a bearer token in `localStorage`, not cookies, so no
+cross-site cookie or `SameSite` configuration is needed. The browser sends
+`Authorization: Bearer ...`; FastAPI's CORS middleware allows that header for
+origins listed in `CORS_ORIGINS`.
+
+**Build-context rule:** `backend/Dockerfile` does `COPY backend/ ./`, so the
+Docker build context must be the repository root. When a platform asks for a
+"root directory", leave it at the repo root and point at the Dockerfile — do
+not set it to `backend/`.
+
+### 5.2 Backend on Render (Blueprint)
+
+The repository ships `render.yaml` at the root.
+
+1. Render Dashboard → **New → Blueprint** → select this repository.
+2. Apply the blueprint. It creates `lakewatch-db` (Postgres) and the
+   `lakewatch-api` web service.
+3. Open the service → **Environment** → set `CORS_ORIGINS` to the exact Pages
+   origin, for example `https://lakewatch.pages.dev`. Add a comma-separated
+   list if you use a custom domain as well. No trailing slash.
+4. Wait for `/health` to report healthy, then create the first administrator
+   from the Render **Shell**:
+
+   ```bash
+   python -m app.cli bootstrap-admin --email admin@example.org --name "System Administrator"
+   ```
+
+5. Note the service URL (e.g. `https://lakewatch-api.onrender.com`). The API
+   docs live there at `/docs`; the frontend no longer proxies them.
+
+Free-plan caveats: the free Postgres instance expires after about 30 days, free
+web services sleep after inactivity (the first request is slow), and the
+filesystem is ephemeral — uploads and generated reports survive only until the
+next deploy. For real use, upgrade the service, attach a Render disk mounted at
+`/var/data`, and keep `STORAGE_ROOT=/var/data/storage` (already the blueprint
+default).
+
+### 5.3 Backend on Railway
+
+The repository ships `railway.toml` at the root.
+
+1. Railway → **New Project → Deploy from GitHub repo**.
+2. Add a **PostgreSQL** database to the project. Railway injects
+   `DATABASE_URL`; `backend/app/core/config.py` rewrites `postgresql://` to the
+   psycopg 3 dialect automatically, so no manual editing is needed.
+3. Confirm the service root is the **repository root** (the Dockerfile copies
+   `backend/`), and that the config file `railway.toml` is detected.
+4. Set these service variables:
+
+   ```ini
+   SECRET_KEY=<python -c "import secrets; print(secrets.token_urlsafe(48))">
+   ENVIRONMENT=production
+   AUTO_CREATE_TABLES=false
+   STARTUP_BOOTSTRAP=false
+   JOBS_ENABLED=true
+   JOBS_WORKER_COUNT=2
+   STORAGE_ROOT=/data/storage
+   CORS_ORIGINS=https://<your-pages-project>.pages.dev
+   ```
+
+5. Add a **Volume** mounted at `/data` so storage survives deploys, then
+   generate a public domain under **Settings → Networking**.
+6. Create the first admin from the Railway shell:
+
+   ```bash
+   python -m app.cli bootstrap-admin --email admin@example.org --name "System Administrator"
+   ```
+
+`railway.toml` builds `backend/Dockerfile`, checks `/health`, and restarts on
+failure. The container entrypoint runs `alembic upgrade head` before Uvicorn,
+so migrations apply on every deploy.
+
+### 5.4 Frontend on Cloudflare Pages
+
+1. Cloudflare Dashboard → **Workers & Pages → Create → Pages → Connect to Git**.
+2. Select the repository.
+3. Framework preset: **Vite** (or `None`).
+4. **Root directory:** `frontend`.
+5. **Build command:** `npm ci && npm run build`.
+6. **Build output directory:** `dist`.
+7. Environment variables:
+   - `VITE_API_BASE_URL=https://<backend-host>/api/v1` — absolute, with the
+     `/api/v1` suffix and no trailing slash.
+   - `NODE_VERSION=22`.
+8. Deploy.
+
+`frontend/public/_redirects` contains `/* /index.html 200`, so deep links such
+as `/public`, `/research/analysis` and `/admin/users` work on refresh. Vite
+copies that file into `dist/` during the build.
+
+`VITE_API_BASE_URL` is **inlined at build time**. Changing the backend URL (for
+example after renaming a Render service) requires a new frontend deployment.
+Cloudflare preview deployments receive a random `*.pages.dev` hostname; either
+add that hostname to `CORS_ORIGINS` and redeploy the backend, or restrict
+preview deployments to the production branch.
+
+### 5.5 Minimum backend variables for the split setup
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | injected by Render/Railway (both URL forms are accepted) |
+| `SECRET_KEY` | long random value, generated by the platform or you |
+| `ENVIRONMENT` | `production` |
+| `AUTO_CREATE_TABLES` | `false` — Alembic owns the schema |
+| `STARTUP_BOOTSTRAP` | `false` — create the admin explicitly |
+| `STORAGE_ROOT` | Render `/var/data/storage`, Railway `/data/storage` |
+| `JOBS_ENABLED` | `true` |
+| `CORS_ORIGINS` | the exact Pages origin(s), comma-separated |
+| `AI_*` | optional; leave blank to disable the assistant |
+
+Keep the backend at **one instance**. Background jobs (ingestion, processing,
+indicator runs, report builds) execute inside the API process; scaling to
+multiple instances would run duplicate workers. If you need horizontal scaling
+later, move the job runner into a separate worker service first.
+
+### 5.6 Post-deploy verification
+
+```bash
+curl -f https://<backend-host>/health
+curl -f https://<backend-host>/api/v1/public/overview   # anonymous; total may be 0
+curl -f https://<backend-host>/api/v1/public/map
+```
+
+Then, in a browser:
+
+1. Open the Pages URL, sign in, and confirm the dashboard loads data from the
+   backend origin (browser DevTools → Network shows requests to the Render or
+   Railway host, not the Pages host).
+2. Publish one dataset and one alert, open `/public` in a private window, and
+   confirm the published items appear.
+3. If the browser reports a CORS error, compare the `Origin` request header
+   byte-for-byte with `CORS_ORIGINS` (scheme + host, no trailing slash) and
+   redeploy the backend after changing it.
+
+### 5.7 Optional: remove CORS entirely with a same-origin proxy
+
+If you would rather keep the browser talking to one origin, add a Cloudflare
+Pages Function that forwards `/api/*` to the backend and build the frontend
+with the default `VITE_API_BASE_URL=/api/v1`. Create
+`frontend/functions/api/[[path]].ts`:
+
+```ts
+export const onRequest: PagesFunction<{ API_ORIGIN: string }> = async ({ request, env, params }) => {
+  const rest = Array.isArray(params.path) ? params.path.join("/") : (params.path ?? "");
+  const incoming = new URL(request.url);
+  const target = new URL(`/api/${rest}${incoming.search}`, env.API_ORIGIN);
+  return fetch(new Request(target, request));
+};
+```
+
+Set `API_ORIGIN=https://<backend-host>` as a Pages variable and leave
+`VITE_API_BASE_URL` unset (it then defaults to `/api/v1`). The browser sees only
+the Pages origin, so `CORS_ORIGINS` is no longer involved. The direct-URL
+approach in §5.4 is simpler; use the proxy when you want a single public origin
+or a place to add edge caching/rate limiting.
