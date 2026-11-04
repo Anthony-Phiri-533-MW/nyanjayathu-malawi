@@ -31,3 +31,9 @@ Thumbs.db
 
 # Personal review documents (not part of the project source)
 *.pdf
+*.docx
+
+# Local-only files that must never be published
+aaaassssskeyKEY.txt
+mini sample creds.txt
+lake-malawi-satellite-monitoring-app-build.json
