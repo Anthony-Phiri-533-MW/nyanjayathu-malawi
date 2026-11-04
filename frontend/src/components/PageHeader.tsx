@@ -6,19 +6,33 @@ export function PageHeader({
   title,
   description,
   actions,
+  eyebrow,
+  meta,
   className,
 }: {
   title: string;
   description?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Small contextual line above the heading (section, area, period). */
+  eyebrow?: React.ReactNode;
+  /** Secondary status line below the description (freshness, scope, notes). */
+  meta?: React.ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("mb-5 flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="min-w-0">
+        {eyebrow ? (
+          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-water-700">{eyebrow}</p>
+        ) : null}
         <h1 className="text-xl font-semibold text-ink">{title}</h1>
         {description ? (
           <p className="mt-1 max-w-3xl text-sm text-muted">{description}</p>
+        ) : null}
+        {meta ? (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
+            {meta}
+          </div>
         ) : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}

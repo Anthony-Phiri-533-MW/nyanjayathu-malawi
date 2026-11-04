@@ -419,6 +419,7 @@ export interface IndicatorResult {
   spatial_resolution: string;
   quality_flag: QualityFlag;
   quality_reason: string;
+  spatial_extent_geojson: GeoJSONGeometry | null;
   flag_reasons: unknown;
   coverage_fraction: number | null;
   missing_fraction: number | null;
@@ -659,8 +660,49 @@ export interface PublicMapFeature {
 export interface PublicMapCollection {
   type: "FeatureCollection";
   features: PublicMapFeature[];
+  dataset_coverages: PublicDatasetCoverage[];
   generated_at: string;
   provenance: string;
+}
+
+export interface PublicDatasetCoverage {
+  type: "Feature";
+  id: number;
+  geometry: GeoJSONGeometry;
+  properties: {
+    id: number;
+    title: string;
+    is_raw: boolean;
+    quality_flag: string;
+    start_date: string | null;
+    end_date: string | null;
+  };
+}
+
+export interface PublicWaterExtent {
+  id: number;
+  dataset_id: number;
+  dataset_title: string;
+  observed_start: string;
+  observed_end: string;
+  value: number;
+  unit: string;
+  quality_flag: string;
+  spatial_extent_geojson: GeoJSONGeometry;
+}
+
+export interface AssistantMetric {
+  label: string;
+  value: string;
+}
+
+export interface AssistantInterpretRequest {
+  question: string;
+  metrics: AssistantMetric[];
+}
+
+export interface AssistantInterpretResponse {
+  answer: string;
 }
 
 // ---------------------------------------------------------------- ingestion

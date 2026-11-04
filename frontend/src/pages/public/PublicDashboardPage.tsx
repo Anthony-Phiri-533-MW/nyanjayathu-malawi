@@ -1,17 +1,16 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import {
-  MapContainer,
-  TileLayer,
-  GeoJSON,
-  LayersControl,
-} from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import type { GeoJsonObject } from "geojson";
 import { Badge, Card, CardBody, CardHeader } from "@/components/ui/Card";
+import { LakeMapPanel } from "@/components/LakeMapPanel";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/States";
 import { Pagination, Table, Td, Th, Tr } from "@/components/ui/Table";
-import { usePublicAlerts, usePublicDatasets, usePublicMap, usePublicOverview } from "@/lib/hooks";
+import {
+  usePublicAlerts,
+  usePublicDatasets,
+  usePublicMap,
+  usePublicOverview,
+  usePublicWaterExtents,
+} from "@/lib/hooks";
 import { formatBytes, formatDate, formatDateTime, formatNumber, titleCase } from "@/lib/format";
 import type { AlertSeverity } from "@/lib/types";
 
@@ -62,8 +61,7 @@ export function PublicDashboardPage() {
   const datasets = usePublicDatasets({ page: 1, size: 50 });
   const alerts = usePublicAlerts({ page: 1, size: 50 });
   const map = usePublicMap();
-
-  const center: [number, number] = [-12.5, 34.6];
+  const waterExtents = usePublicWaterExtents({ page: 1, size: 200 });
 
   const activeSeverityTotals = useMemo(() => {
     const out: Record<string, number> = {};
@@ -151,81 +149,17 @@ export function PublicDashboardPage() {
           </div>
         ) : null}
 
-        {/* Map — published study areas with per-area public counts */}
-        <Card>
-          <CardHeader
-            title="Public map"
-            description="Published study areas. A red badge means at least one critical public alert is active there."
-          />
-          <div className="h-[26rem] overflow-hidden rounded-card">
-            {map.isLoading ? (
-              <LoadingRows rows={4} />
-            ) : map.isError ? (
-              <ErrorState error={map.error} onRetry={() => map.refetch()} />
-            ) : map.data && map.data.features.length > 0 ? (
-              <MapContainer center={center} zoom={7} scrollWheelZoom className="h-full w-full">
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <LayersControl position="topright">
-                  {(map.data?.features ?? []).map((feature) => {
-                    const severe = feature.properties.highest_active_severity === "critical";
-                    return (
-                      <LayersControl.Overlay
-                        key={feature.properties.id}
-                        checked
-                        name={feature.properties.name}
-                      >
-                        <GeoJSON
-                          data={feature as unknown as GeoJsonObject}
-                          style={{
-                            color: severe ? "#b4231f" : "#17497f",
-                            weight: 2,
-                            fillColor: severe ? "#e35d5b" : "#3b82f6",
-                            fillOpacity: severe ? 0.18 : 0.08,
-                          }}
-                          onEachFeature={(_f, layer) => {
-                            const p = feature.properties;
-                            const lines = [
-                              `<strong>${p.name}</strong>`,
-                              `${p.public_dataset_count} published dataset(s)`,
-                              `${p.active_public_alerts} active public alert(s)`,
-                            ];
-                            for (const [severity, count] of Object.entries(p.by_severity)) {
-                              lines.push(`${titleCase(severity)}: ${count}`);
-                            }
-                            layer.bindPopup(lines.join("<br/>"));
-                          }}
-                        />
-                      </LayersControl.Overlay>
-                    );
-                  })}
-                </LayersControl>
-              </MapContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center">
-                <EmptyState
-                  title="Nothing published on the map yet"
-                  description="When the team publishes a study area, its boundary and public counts appear here."
-                />
-              </div>
-            )}
-          </div>
-          <CardBody className="border-t border-border">
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted">
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm border border-water-700 bg-water-300/40" />
-                Published study area
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded-sm border border-danger-500 bg-danger-300/40" />
-                Has a critical active alert
-              </span>
-              {overview.data ? <span>{overview.data.dataset_count} published dataset(s) in total</span> : null}
-            </div>
-          </CardBody>
-        </Card>
+        <LakeMapPanel
+          mapData={map.data}
+          waterExtents={waterExtents.data?.items ?? []}
+          isLoading={map.isLoading}
+          mapError={map.error}
+          timelineError={waterExtents.error}
+          onRetry={() => {
+            void map.refetch();
+            void waterExtents.refetch();
+          }}
+        />
 
         {/* Published alerts */}
         <Card>

@@ -17,6 +17,8 @@ import type {
   AlertActionInput,
   AlertDetail,
   AlertRecord,
+  AssistantInterpretRequest,
+  AssistantInterpretResponse,
   AuditEvent,
   Comparison,
   ComparisonInput,
@@ -48,6 +50,7 @@ import type {
   PublicDataset,
   PublicMapCollection,
   PublicOverview,
+  PublicWaterExtent,
   QualityFlag,
   Report,
   ReportInput,
@@ -297,10 +300,11 @@ export function useProviders() {
   });
 }
 
-export function useStudyAreas() {
+export function useStudyAreas(enabled = true) {
   return useQuery({
     queryKey: qk.studyAreas,
     queryFn: () => api.get<StudyArea[]>("/study-areas"),
+    enabled,
     staleTime: 60_000,
   });
 }
@@ -487,7 +491,7 @@ export function useTimeSeries(
 ) {
   return useQuery({
     queryKey: qk.timeseries(params),
-    queryFn: () => api.get<TimeSeries>("/analysis/timeseries", params),
+    queryFn: () => api.get<TimeSeries>("/timeseries", params),
     enabled: Boolean(params.indicator_key),
     ...options,
   });
@@ -495,7 +499,7 @@ export function useTimeSeries(
 
 export function useComparePeriods() {
   return useMutation({
-    mutationFn: (payload: ComparisonInput) => api.post<Comparison>("/analysis/compare", payload),
+    mutationFn: (payload: ComparisonInput) => api.post<Comparison>("/compare", payload),
   });
 }
 
@@ -567,6 +571,7 @@ export function usePublicOverview() {
     queryKey: ["public", "overview"],
     queryFn: () =>
       apiRequest<PublicOverview>("/public/overview", { method: "GET", anonymous: true }),
+    refetchInterval: 30_000,
   });
 }
 
@@ -575,6 +580,7 @@ export function usePublicDatasets(params: { page?: number; size?: number }) {
     queryKey: ["public", "datasets", params],
     queryFn: () =>
       apiRequest<Page<PublicDataset>>("/public/datasets", { method: "GET", query: params, anonymous: true }),
+    refetchInterval: 30_000,
   });
 }
 
@@ -583,6 +589,7 @@ export function usePublicAlerts(params: { severity?: string; kind?: string; page
     queryKey: ["public", "alerts", params],
     queryFn: () =>
       apiRequest<Page<PublicAlert>>("/public/alerts", { method: "GET", query: params, anonymous: true }),
+    refetchInterval: 30_000,
   });
 }
 
@@ -590,6 +597,20 @@ export function usePublicMap() {
   return useQuery({
     queryKey: ["public", "map"],
     queryFn: () => apiRequest<PublicMapCollection>("/public/map", { method: "GET", anonymous: true }),
+    refetchInterval: 30_000,
+  });
+}
+
+export function usePublicWaterExtents(params: { page?: number; size?: number } = {}) {
+  return useQuery({
+    queryKey: ["public", "water-extents", params],
+    queryFn: () =>
+      apiRequest<Page<PublicWaterExtent>>("/public/water-extents", {
+        method: "GET",
+        query: params,
+        anonymous: true,
+      }),
+    refetchInterval: 30_000,
   });
 }
 
@@ -702,10 +723,18 @@ export function useForecasts(params: {
   study_area_id?: number;
   page?: number;
   size?: number;
-} = {}) {
+} = {}, enabled = true) {
   return useQuery({
     queryKey: qk.forecasts(params),
     queryFn: () => api.get<Page<ForecastValue>>("/disaster/forecasts", params),
+    enabled,
+  });
+}
+
+export function useInterpretAssistant() {
+  return useMutation({
+    mutationFn: (payload: AssistantInterpretRequest) =>
+      api.post<AssistantInterpretResponse>("/assistant/interpret", payload),
   });
 }
 
