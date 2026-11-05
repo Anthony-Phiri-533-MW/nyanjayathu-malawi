@@ -182,7 +182,7 @@ export function MapPage() {
  * enabled and the dates are within the source's declared span).
  */
 function IngestionCard() {
-  const sources = useDataSources({ page: 1, size: 100, status: "configured" });
+  const sources = useDataSources({ page: 1, size: 100 });
   const studyAreas = useStudyAreas();
   const request = useRequestIngestion();
 
