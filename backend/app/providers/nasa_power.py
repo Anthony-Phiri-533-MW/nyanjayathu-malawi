@@ -32,7 +32,7 @@ from app.providers.base import (
 
 log = logging.getLogger("lakewatch.providers.power")
 
-DEFAULT_PARAMETERS = ["T2M", "PRECTOTCORR", "RH2M"]
+DEFAULT_PARAMETERS = ["T2M", "PRECTOTCORR", "WS2M", "ALLSKY_SFC_SW_DWN"]
 MAX_CHUNK_DAYS = 365
 DEFAULT_FILL = -999.0
 
