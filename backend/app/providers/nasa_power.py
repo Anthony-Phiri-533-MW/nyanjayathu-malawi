@@ -41,7 +41,7 @@ class NasaPowerAdapter(ProviderAdapter):
     key = "nasa_power"
     label = "NASA POWER daily meteorology (point)"
     category = "satellite_temperature"
-    product_type = "NASA POWER daily point meteorology (T2M, precipitation, humidity)"
+    product_type = "NASA POWER daily point meteorology (temperature, precipitation, wind, solar)"
     description = (
         "NASA POWER daily point API (MERRA-2 based) sampled at the study-area "
         "representative coordinate. Daily values in the units reported by the "
@@ -63,7 +63,8 @@ class NasaPowerAdapter(ProviderAdapter):
     default_variables = [
         {"key": "T2M", "label": "2 m air temperature", "unit": "C"},
         {"key": "PRECTOTCORR", "label": "Corrected precipitation", "unit": "mm/day"},
-        {"key": "RH2M", "label": "2 m relative humidity", "unit": "%"},
+        {"key": "WS2M", "label": "2 m wind speed", "unit": "m/s"},
+        {"key": "ALLSKY_SFC_SW_DWN", "label": "All-sky surface shortwave radiation", "unit": "kWh/m2/day"},
     ]
 
     def _base(self) -> str:
