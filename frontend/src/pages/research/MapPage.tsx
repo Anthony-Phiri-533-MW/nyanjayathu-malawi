@@ -212,7 +212,7 @@ function IngestionCard() {
               start_date: startDate,
               end_date: endDate,
             });
-            setBanner({ tone: "ok", text: `Queued ingestion job #${job.job_id} (${job.discovered_count} found).` });
+            setBanner({ tone: "ok", text: `Queued ingestion job #${job.job_id}.` });
           } catch (error) {
             setBanner({
               tone: "error",
