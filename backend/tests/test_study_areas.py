@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from app.services.bootstrap import LAKE_MALAWI_BOUNDARY
+
 AOI = {
     "type": "Polygon",
     "coordinates": [[[34.2, -12.7], [34.6, -12.7], [34.6, -12.3], [34.2, -12.3], [34.2, -12.7]]],
@@ -103,6 +105,10 @@ def test_default_study_area_cannot_be_deleted(
     client: TestClient, admin_headers: dict[str, str], default_study_area: dict
 ) -> None:
     area_id = default_study_area["id"]
+    assert default_study_area["name"] == "Lake Malawi (lake extent)"
+    assert default_study_area["boundary_geojson"] == LAKE_MALAWI_BOUNDARY
+    assert default_study_area["minx"] < 34.0
+    assert default_study_area["maxx"] > 35.0
     response = client.delete(f"/api/v1/study-areas/{area_id}", headers=admin_headers)
     assert response.status_code == 409
 
