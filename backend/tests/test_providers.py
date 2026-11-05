@@ -26,7 +26,7 @@ def test_get_provider(client: TestClient, admin_headers: dict[str, str]) -> None
     assert response.status_code == 200
     body = response.json()
     assert body["key"] == "chirps"
-    assert body["label"] == "CHIRPS v2.0"
+    assert body["label"] == "CHIRPS v2.0 daily rainfall"
     assert body["auth_required"] is False
 
     response = client.get("/api/v1/providers/no_such_provider", headers=admin_headers)
