@@ -101,8 +101,8 @@ export function LakeMapPanel({
           className="h-full w-full"
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='Tiles &copy; <a href="https://www.esri.com/">Esri</a> — Sources: Esri, HERE, Garmin, FAO, NOAA, USGS, EPA, NPS, and the GIS User Community'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
           />
           <LayersControl position="topright">
             <LayersControl.Overlay checked name="Lake Malawi / Nyasa">
