@@ -19,6 +19,12 @@ function layerPopup(text: string): HTMLElement {
   return popup;
 }
 
+/** Keep the map focused on Malawi and the lake's full shoreline. */
+const MALAWI_BOUNDS: [[number, number], [number, number]] = [
+  [-17.2, 32.6], // south-west
+  [-9.3, 35.9], // north-east
+];
+
 export function LakeMapPanel({
   mapData,
   waterExtents,
@@ -91,12 +97,14 @@ export function LakeMapPanel({
           </span>
         }
       />
-      <div className="h-[28rem] sm:h-[32rem]">
+      <div className="h-[34rem] sm:h-[42rem]">
         <MapContainer
           center={[-13.25, 34.25]}
           zoom={5}
           minZoom={4}
           maxZoom={13}
+          maxBounds={MALAWI_BOUNDS}
+          maxBoundsViscosity={1.0}
           scrollWheelZoom
           className="h-full w-full"
         >
