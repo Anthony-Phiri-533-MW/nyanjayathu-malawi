@@ -93,9 +93,9 @@ export function LakeMapPanel({
       />
       <div className="h-[28rem] sm:h-[32rem]">
         <MapContainer
-          center={[-12.6, 34.45]}
-          zoom={6.2}
-          minZoom={5}
+          center={[-13.25, 34.25]}
+          zoom={5}
+          minZoom={4}
           maxZoom={13}
           scrollWheelZoom
           className="h-full w-full"
