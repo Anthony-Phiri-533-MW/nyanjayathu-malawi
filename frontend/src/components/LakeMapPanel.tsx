@@ -113,14 +113,14 @@ export function LakeMapPanel({
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}"
           />
           <LayersControl position="topright">
-            <LayersControl.Overlay checked name="Lake Malawi / Nyasa">
+            <LayersControl.Overlay checked name="Lake Malawi / Nyasa shoreline">
               <GeoJSON
                 data={LAKE_MALAWI_FEATURE}
                 style={{
-                  color: "#0f766e",
+                  color: "#0f5f9e",
                   weight: 2,
-                  fillColor: "#2dd4bf",
-                  fillOpacity: 0.62,
+                  fillColor: "#38bdf8",
+                  fillOpacity: 0.45,
                 }}
                 onEachFeature={(_feature, layer) => {
                   layer.bindTooltip("Lake Malawi / Nyasa", { sticky: true });
