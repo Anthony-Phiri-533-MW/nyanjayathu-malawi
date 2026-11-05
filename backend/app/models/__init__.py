@@ -4,6 +4,7 @@ from app.models.base import Base, utcnow
 from app.models.data_source import DataSource, Threshold, ThresholdVersion
 from app.models.disaster import Alert, AlertResponse, ForecastValue
 from app.models.job import Job
+from app.models.ml import ForecastRun, MLModel, ModelEvaluation
 from app.models.report import Report
 from app.models.research import (
     DataProduct,
@@ -16,6 +17,7 @@ from app.models.research import (
     QualityAssessment,
     StudyArea,
 )
+from app.models.scheduler import SchedulerRun
 from app.models.user import Permission, Role, User, role_permissions, user_roles
 
 __all__ = [
@@ -27,16 +29,20 @@ __all__ = [
     "DataSource",
     "Dataset",
     "ExportJob",
+    "ForecastRun",
     "ForecastValue",
     "IndicatorDefinition",
     "IndicatorResult",
     "IngestionJob",
     "Job",
+    "MLModel",
+    "ModelEvaluation",
     "Permission",
     "ProcessingRun",
     "QualityAssessment",
     "Report",
     "Role",
+    "SchedulerRun",
     "StudyArea",
     "Threshold",
     "ThresholdVersion",

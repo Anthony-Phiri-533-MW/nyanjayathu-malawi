@@ -169,6 +169,9 @@ class DataSourceCreate(BaseModel):
     ingestion_config: dict | None = None
     auth_method: str = "none"
     credential_ref: str | None = Field(default=None, max_length=255)
+    schedule_enabled: bool = False
+    schedule_time_utc: str = Field(default="02:00", pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    schedule_lookback_days: int = Field(default=3, ge=1, le=60)
 
     @field_validator("category")
     @classmethod
@@ -224,6 +227,9 @@ class DataSourceUpdate(BaseModel):
     ingestion_config: dict | None = None
     auth_method: str | None = None
     credential_ref: str | None = Field(default=None, max_length=255)
+    schedule_enabled: bool | None = None
+    schedule_time_utc: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    schedule_lookback_days: int | None = Field(default=None, ge=1, le=60)
 
     @field_validator("auth_method")
     @classmethod
@@ -274,6 +280,10 @@ class DataSourceOut(BaseModel):
     last_success_at: datetime | None = None
     error_status: str | None = None
     error_detail: str | None = None
+    schedule_enabled: bool = False
+    schedule_time_utc: str = "02:00"
+    schedule_lookback_days: int = 3
+    last_scheduled_at: datetime | None = None
     dataset_count: int = 0      # datasets actually retrieved through this source
     created_at: datetime
     updated_at: datetime | None = None

@@ -28,6 +28,10 @@ from app.providers.base import (
     TestResult,
     _noop_progress,
 )
+
+# SAS tokens are issued with a future start time; wait a few seconds before
+# fetching so the token becomes valid.
+SAS_TOKEN_DELAY = 8  # seconds
 from app.providers.raster import (
     AssetRule,
     download_file,

@@ -203,6 +203,9 @@ def record_forecast(db: Session, *, payload: ForecastCreate, actor: User) -> For
         value=payload.value,
         unit=payload.unit,
         note=payload.note.strip(),
+        source="manual",
+        lead_time_days=max(0, (payload.target_date - utcnow().date()).days),
+        issued_at=utcnow(),
         created_at=utcnow(),
         created_by_id=actor.id,
     )

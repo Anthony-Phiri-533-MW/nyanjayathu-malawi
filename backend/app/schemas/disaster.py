@@ -41,6 +41,15 @@ class ForecastOut(BaseModel):
     value: float
     unit: str
     note: str
+    source: str = "manual"
+    model_id: int | None = None
+    model_name: str | None = None
+    model_algorithm: str | None = None
+    run_id: int | None = None
+    lead_time_days: int = 0
+    lower: float | None = None
+    upper: float | None = None
+    issued_at: datetime | None = None
     created_at: datetime
     created_by_email: str | None = None
 

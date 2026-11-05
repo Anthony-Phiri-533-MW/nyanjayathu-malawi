@@ -23,6 +23,12 @@ from app.schemas.disaster import (
     AlertResponseOut,
     ForecastOut,
 )
+from app.schemas.ml import (
+    ForecastRunOut,
+    MLModelOut,
+    ModelEvaluationOut,
+    SchedulerRunOut,
+)
 from app.schemas.public import PublicAlertOut, PublicDatasetOut, PublicWaterExtentOut
 from app.schemas.report import ReportOut
 from app.schemas.research import (
@@ -312,6 +318,10 @@ def data_source_out(source, *, dataset_count: int = 0) -> DataSourceOut:
         last_success_at=source.last_success_at,
         error_status=source.error_status,
         error_detail=source.error_detail,
+        schedule_enabled=source.schedule_enabled,
+        schedule_time_utc=source.schedule_time_utc,
+        schedule_lookback_days=source.schedule_lookback_days,
+        last_scheduled_at=source.last_scheduled_at,
         dataset_count=dataset_count,
         created_at=source.created_at,
         updated_at=source.updated_at,
@@ -393,6 +403,7 @@ def _user_email(user) -> str | None:
 
 
 def forecast_out(row) -> ForecastOut:
+    model = getattr(row, "model", None)
     return ForecastOut(
         id=row.id,
         study_area_id=row.study_area_id,
@@ -402,8 +413,103 @@ def forecast_out(row) -> ForecastOut:
         value=row.value,
         unit=row.unit,
         note=row.note,
+        source=getattr(row, "source", "manual") or "manual",
+        model_id=getattr(row, "model_id", None),
+        model_name=model.name if model is not None else None,
+        model_algorithm=model.algorithm if model is not None else None,
+        run_id=getattr(row, "run_id", None),
+        lead_time_days=getattr(row, "lead_time_days", 0) or 0,
+        lower=getattr(row, "lower", None),
+        upper=getattr(row, "upper", None),
+        issued_at=getattr(row, "issued_at", None),
         created_at=row.created_at,
         created_by_email=_user_email(row.created_by),
+    )
+
+
+# ----------------------------------------------------------------- machine learning
+def ml_model_out(row) -> MLModelOut:
+    return MLModelOut(
+        id=row.id,
+        key=row.key,
+        name=row.name,
+        algorithm=row.algorithm,
+        version=row.version,
+        indicator_key=row.indicator_key,
+        study_area_id=row.study_area_id,
+        study_area_name=row.study_area.name if row.study_area is not None else None,
+        cadence=row.cadence,
+        n_lags=row.n_lags,
+        feature_names=row.feature_names_json,
+        params=row.params_json,
+        train_start=row.train_start,
+        train_end=row.train_end,
+        n_train=row.n_train,
+        metrics=row.metrics_json,
+        rmse=row.rmse,
+        mae=row.mae,
+        bias=row.bias,
+        skill_score=row.skill_score,
+        artifact_sha256=row.artifact_sha256,
+        is_active=row.is_active,
+        trained_at=row.trained_at,
+    )
+
+
+def model_evaluation_out(row) -> ModelEvaluationOut:
+    return ModelEvaluationOut(
+        id=row.id,
+        model_id=row.model_id,
+        indicator_key=row.indicator_key,
+        study_area_id=row.study_area_id,
+        fold=row.fold,
+        horizon_days=row.horizon_days,
+        train_start=row.train_start,
+        train_end=row.train_end,
+        test_start=row.test_start,
+        test_end=row.test_end,
+        n_train=row.n_train,
+        n_test=row.n_test,
+        rmse=row.rmse,
+        mae=row.mae,
+        bias=row.bias,
+        mape=row.mape,
+        r2=row.r2,
+        skill_score=row.skill_score,
+        coverage=row.coverage,
+        metrics=row.metrics_json,
+    )
+
+
+def forecast_run_out(row) -> ForecastRunOut:
+    return ForecastRunOut(
+        id=row.id,
+        study_area_id=row.study_area_id,
+        study_area_name=row.study_area.name if row.study_area is not None else None,
+        indicator_key=row.indicator_key,
+        model_id=row.model_id,
+        status=row.status,
+        horizon_days=row.horizon_days,
+        issued_at=row.issued_at,
+        finished_at=row.finished_at,
+        row_count=row.row_count,
+        message=row.message,
+        metrics=row.metrics_json,
+    )
+
+
+# --------------------------------------------------------------------- scheduler
+def scheduler_run_out(row) -> SchedulerRunOut:
+    return SchedulerRunOut(
+        id=row.id,
+        run_date=row.run_date,
+        status=row.status,
+        trigger=row.trigger,
+        job_id=row.job_id,
+        started_at=row.started_at,
+        finished_at=row.finished_at,
+        summary=row.summary_json,
+        error=row.error,
     )
 
 

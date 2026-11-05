@@ -11,6 +11,7 @@ snapshots or staff attributions; see ``app/schemas/public.py``.
 from __future__ import annotations
 
 from typing import Annotated
+import json
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
@@ -23,7 +24,7 @@ from app.api.serializers import (
 )
 from app.core.database import get_db
 from app.core.deps import CurrentUser, require_permissions
-from app.schemas.common import Page
+from app.schemas.common import Page, AssistantInterpretRequest
 from app.schemas.public import (
     PublicAlertOut,
     PublicDatasetOut,
@@ -179,3 +180,47 @@ def set_study_area_public(
     )
     # publishing a study area changes the public map, so return the fresh map
     return service.public_map(db) if payload.is_public else {"id": area.id, "is_public": False}
+
+
+# --------------------------------------------------------------------------
+# Optional: AI assistant interpretation (anonymous, for public dashboard).
+# Calls the same OpenRouter endpoint but without bearer token requirement.
+# --------------------------------------------------------------------------
+
+@router.post("/interpret-metrics", response_model=dict)
+async def public_interpret_metrics(
+    question: str,
+    metrics_json: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> dict:
+    """Interpret dashboard metrics using the configured OpenRouter / Nemotron model.
+    Intended for the public dashboard where no user is logged in.
+    """
+    try:
+        raw_metrics = json.loads(metrics_json or "[]")
+    except json.JSONDecodeError:
+        raise UpstreamServiceError("Invalid metrics JSON payload.")
+
+    # Transform raw metrics into AssistantMetric format (label + value)
+    # The public dashboard passes {key, name, value, unit, category}; the assistant
+    # expects {label, value}. We map name -> label and value -> value.
+    metrics = [
+        {"label": m.get("name", m.get("key", "")), "value": str(m.get("value", ""))}
+        for m in raw_metrics
+    ]
+
+    # Re-use the assistant logic (but without auth header)
+    from app.services.assistant import interpret_metrics
+
+    # Build a minimal request - AssistantInterpretRequest is defined inline
+    # since it's not imported from common to avoid circular deps.
+    from pydantic import BaseModel
+
+    class _AssistantInterpretRequest(BaseModel):
+        question: str
+        metrics: list[dict] = []
+
+    payload = _AssistantInterpretRequest(question=question, metrics=metrics)  # type: ignore[valid-type]
+    answer = await interpret_metrics(payload)  # type: ignore[arg-type]
+
+    return {"answer": answer, "model": settings.ai_model, "provider": "openrouter"}

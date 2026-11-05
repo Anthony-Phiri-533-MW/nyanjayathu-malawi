@@ -43,3 +43,8 @@ class PaginationParams(BaseModel):
     @property
     def offset(self) -> int:
         return (self.page - 1) * self.size
+
+
+class AssistantInterpretRequest(BaseModel):
+    question: str
+    metrics: list[dict] = []

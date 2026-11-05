@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -24,7 +25,7 @@ def _create_source(
             "provider_key": provider_key,
             "category": category,
             "dataset_name": "CHIRPS v2.0 daily",
-            "dataset_identifier": "chirps-v2-0",
+            "dataset_identifier": f"chirps-v2-0-{uuid4().hex[:8]}",
             "description": "test data source",
             "is_enabled": is_enabled,
             "temporal_start": date(2020, 1, 1).isoformat(),
@@ -53,7 +54,7 @@ def test_create_list_get_update_delete_data_source(
     # get
     got = client.get(f"/api/v1/admin/data-sources/{source['id']}", headers=admin_headers).json()
     assert got["id"] == source["id"]
-    assert got["category"] == "climate"
+    assert got["category"] == "satellite_rainfall"
 
     # update
     updated = client.patch(
@@ -80,10 +81,10 @@ def test_data_source_filtering(
 
     listed = client.get(
         "/api/v1/admin/data-sources",
-        params={"category": "climate", "size": 50},
+        params={"category": "satellite_rainfall", "size": 50},
         headers=admin_headers,
     ).json()
-    assert all(s["category"] == "climate" for s in listed["items"])
+    assert all(s["category"] == "satellite_rainfall" for s in listed["items"])
     assert len(listed["items"]) == 1
 
     listed = client.get(
@@ -136,8 +137,16 @@ def test_data_source_validation(
 
 
 def test_data_source_test_connection(
-    client: TestClient, admin_headers: dict[str, str]
+    client: TestClient, admin_headers: dict[str, str], monkeypatch
 ) -> None:
+    from app.api import data_sources as data_sources_api
+    from app.providers.base import TestResult
+
+    class _WorkingAdapter:
+        def test_connection(self):
+            return TestResult(ok=True, message="test provider connection succeeded", latency_ms=5)
+
+    monkeypatch.setattr(data_sources_api, "_adapter_for", lambda _source: _WorkingAdapter())
     source = _create_source(client, admin_headers)
     response = client.post(
         f"/api/v1/admin/data-sources/{source['id']}/test", headers=admin_headers
@@ -145,8 +154,12 @@ def test_data_source_test_connection(
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["source_id"] == source["id"]
-    assert body["status"] in {"verified", "failed"}
-    assert "message" in body
+    assert body["status"] == "verified"
+    assert body["message"] == "test provider connection succeeded"
+    refreshed = client.get(
+        f"/api/v1/admin/data-sources/{source['id']}", headers=admin_headers
+    ).json()
+    assert refreshed["status"] == "verified"
 
 
 # --------------------------------------------------------------------- permissions

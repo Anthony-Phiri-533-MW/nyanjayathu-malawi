@@ -48,6 +48,14 @@ class DataSource(Base):
     error_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- daily schedule (mirrors DATA_SOURCES.schedule in the ER diagram) ---
+    # ``schedule_enabled`` is deliberately opt-in: an administrator must mark a
+    # source as scheduled before the daily pipeline downloads from it.
+    schedule_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    schedule_time_utc: Mapped[str] = mapped_column(String(5), default="02:00")  # HH:MM
+    schedule_lookback_days: Mapped[int] = mapped_column(Integer, default=3)
+    last_scheduled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

@@ -17,12 +17,19 @@ from app.models.base import Base, GeoJSONType, utcnow
 
 
 class ForecastValue(Base):
-    """A manually recorded forecast value for one indicator/study-area/date.
+    """A projected value for one indicator/study-area/date.
 
-    The system itself has no forecasting engine; forecast values are entered by
-    authorised users (with provenance in ``note``) so the alert evaluation can
-    compare *projected* conditions against thresholds exactly like it compares
-    observed indicator results.
+    Two provenances share this table so the threshold engine has a single
+    source of truth:
+
+    * ``source="manual"`` - entered by an authorised user (with a mandatory
+      provenance note);
+    * ``source="model"`` - produced by the short-term forecasting engine, which
+      links the row to the trained model (``model_id``), the run that issued it
+      (``run_id``) and a prediction interval (``lower``/``upper``).
+
+    The engine never invents a value: rows are written only from ingested
+    indicator results, and a series that is too short produces no row at all.
     """
 
     __tablename__ = "forecast_values"
@@ -34,11 +41,27 @@ class ForecastValue(Base):
     value: Mapped[float] = mapped_column(Float)
     unit: Mapped[str] = mapped_column(String(40))
     note: Mapped[str] = mapped_column(Text, default="")   # provenance / method citation expected here
+
+    # --- model provenance (NULL for manually entered forecasts) -----------
+    source: Mapped[str] = mapped_column(String(10), default="manual", index=True)
+    model_id: Mapped[int | None] = mapped_column(
+        ForeignKey("models.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    run_id: Mapped[int | None] = mapped_column(
+        ForeignKey("forecast_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lead_time_days: Mapped[int] = mapped_column(Integer, default=0)
+    lower: Mapped[float | None] = mapped_column(Float, nullable=True)
+    upper: Mapped[float | None] = mapped_column(Float, nullable=True)
+    issued_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     study_area: Mapped[StudyArea] = relationship(lazy="selectin")  # noqa: F821
     created_by: Mapped[User | None] = relationship(lazy="selectin")  # noqa: F821
+    model: Mapped[object | None] = relationship("MLModel", lazy="selectin")
+    run: Mapped[object | None] = relationship("ForecastRun", lazy="selectin")
 
 
 class Alert(Base):

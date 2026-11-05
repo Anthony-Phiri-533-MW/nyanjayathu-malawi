@@ -23,6 +23,7 @@ from app.providers import close_http_client
 from app.services import handlers  # noqa: F401  (registers job handlers)
 from app.services.bootstrap import run_bootstrap
 from app.services.jobs import start_workers, stop_workers
+from app.services.scheduler import start_scheduler, stop_scheduler
 from app.services.storage import ensure_storage_dirs
 
 logging.basicConfig(
@@ -46,10 +47,12 @@ async def lifespan(_app: FastAPI):
                 raise
     if settings.jobs_enabled:
         start_workers()
+    start_scheduler()
     log.info("LakeWatch API ready (environment=%s)", settings.environment)
     try:
         yield
     finally:
+        stop_scheduler()
         stop_workers()
         close_http_client()
 

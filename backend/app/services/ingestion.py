@@ -81,7 +81,7 @@ def requested_variables(ds: DataSource, explicit: list[str] | None) -> list[str]
     return []
 
 
-def start_ingestion(db: Session, *, payload: IngestionJobCreate, actor: User) -> tuple[Any, IngestionJob]:
+def start_ingestion(db: Session, *, payload: IngestionJobCreate, actor: User | None) -> tuple[Any, IngestionJob]:
     """Create a pending ingestion job (+ its IngestionJob record)."""
     ds = db.get(DataSource, payload.data_source_id)
     if ds is None:
@@ -110,7 +110,7 @@ def start_ingestion(db: Session, *, payload: IngestionJobCreate, actor: User) ->
             "end_date": payload.end_date.isoformat(),
             "variables": variables,
         },
-        requested_by_id=actor.id,
+        requested_by_id=actor.id if actor else None,
         dedupe_key=dedupe,
     )
     db.flush()

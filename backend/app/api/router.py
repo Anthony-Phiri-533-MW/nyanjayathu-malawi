@@ -12,6 +12,7 @@ from app.api import (
     datasets,
     disaster,
     exports,
+    forecasting,
     indicators,
     ingestion,
     jobs,
@@ -19,6 +20,7 @@ from app.api import (
     providers,
     public,
     reports,
+    scheduler,
     study_areas,
     thresholds,
     users,
@@ -41,5 +43,7 @@ api_router.include_router(analysis.router)
 api_router.include_router(assistant.router)
 api_router.include_router(exports.router)
 api_router.include_router(disaster.router)
+api_router.include_router(forecasting.router)
+api_router.include_router(scheduler.router)
 api_router.include_router(reports.router)
 api_router.include_router(public.router)

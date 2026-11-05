@@ -120,6 +120,9 @@ def create_source(db: Session, *, payload: DataSourceCreate, actor: User) -> Dat
         ingestion_config_json=payload.ingestion_config,
         auth_method=payload.auth_method,
         credential_ref=payload.credential_ref,
+        schedule_enabled=payload.schedule_enabled,
+        schedule_time_utc=payload.schedule_time_utc,
+        schedule_lookback_days=payload.schedule_lookback_days,
         status="configured",
         created_by_id=actor.id,
     )
@@ -157,6 +160,9 @@ def update_source(db: Session, *, payload: DataSourceUpdate, actor: User, ds: Da
         "temporal_end",
         "auth_method",
         "credential_ref",
+        "schedule_enabled",
+        "schedule_time_utc",
+        "schedule_lookback_days",
     ):
         if field in data and getattr(ds, field) != data[field]:
             setattr(ds, field, data[field])

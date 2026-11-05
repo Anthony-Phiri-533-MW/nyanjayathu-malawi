@@ -114,37 +114,68 @@ def handle_indicator_job(ctx: JobContext) -> dict:
     )
     if not selection.datasets:
         raise UnprocessableError("no datasets matched the stored indicator job selection")
+    return compute_indicators(
+        ctx.db,
+        keys=keys,
+        selection=selection,
+        params=dict(params.get("params") or {}),
+        actor=ctx.actor,
+        job_id=ctx.job.id,
+        progress=ctx.progress,
+    )
 
+
+def compute_indicators(
+    db: Session,
+    *,
+    keys: list[str],
+    selection: Selection,
+    params: dict[str, Any] | None = None,
+    actor: User | None = None,
+    job_id: int | None = None,
+    progress=None,
+) -> dict:
+    """Run a list of indicator computers over one selection.
+
+    Shared by the background job handler and the daily pipeline so both paths
+    produce identical rows, audit entries and progress semantics.
+    """
+    params = params or {}
     per_key: dict[str, dict[str, Any]] = {}
     errors: dict[str, str] = {}
     total = len(keys)
+
+    def report_base(fraction: float, message: str = "") -> None:
+        if progress:
+            progress(fraction, message)
+
     for index, key in enumerate(keys):
         base = index / total
         span = 1.0 / total
 
         def report(fraction: float, message: str = "", _base=base, _span=span) -> None:
-            ctx.progress(_base + _span * max(0.0, min(1.0, fraction)), message)
+            report_base(_base + _span * max(0.0, min(1.0, fraction)), message)
 
         try:
             results = compute_indicator(
-                ctx.db,
+                db,
                 key=key,
                 selection=selection,
-                params=dict(params.get("params") or {}),
-                actor=ctx.actor,
-                job_id=ctx.job.id,
+                params=dict(params),
+                actor=actor,
+                job_id=job_id,
                 progress=report,
             )
-            ctx.db.commit()
+            db.commit()
             per_key[key] = {
                 "result_count": len(results),
                 "result_ids": [r.id for r in results],
                 "null_values": sum(1 for r in results if r.value is None),
             }
         except Exception as exc:  # isolate per-indicator failures
-            ctx.db.rollback()
+            db.rollback()
             errors[key] = f"{type(exc).__name__}: {exc}"[:600]
-            ctx.db.commit()
+            db.commit()
             report(base + span, f"{key} failed")
 
     if not per_key:
@@ -155,8 +186,9 @@ def handle_indicator_job(ctx: JobContext) -> dict:
     audit_service.record(
         action="indicator.complete",
         resource_type="job",
-        resource_id=ctx.job.id,
-        actor=ctx.actor,
+        resource_id=job_id,
+        actor=actor,
+        db=db,
         message=f"Indicator computation completed ({len(per_key)}/{len(keys)})",
         details={"per_key": per_key, "errors": errors},
     )

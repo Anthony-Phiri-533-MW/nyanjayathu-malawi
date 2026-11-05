@@ -30,8 +30,12 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "research.processing.run": ("Launch preprocessing / indicator-computation jobs", "research"),
     "research.indicators.read": ("View indicator definitions and results", "research"),
     "research.compare.run": ("Compare time periods and datasets", "research"),
+    "research.forecasts.run": ("Train, validate and issue short-term forecasts", "research"),
     "research.exports.create": ("Create export jobs", "research"),
     "research.exports.download": ("Download export outputs", "research"),
+    # --- Automation --------------------------------------------------------
+    "admin.scheduler.read": ("View the daily scheduler status and run history", "admin"),
+    "admin.scheduler.run": ("Trigger a daily pipeline run manually", "admin"),
     # --- Disaster module ---------------------------------------------------
     "disaster.alerts.read": ("View disaster alerts and forecast records", "disaster"),
     "disaster.alerts.respond": ("Acknowledge, annotate and resolve alerts", "disaster"),
@@ -56,6 +60,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "admin.thresholds.read",
         "admin.thresholds.write",
         "admin.audit.read",
+        "admin.scheduler.read",
+        "admin.scheduler.run",
         # administrators may inspect research outputs but do not need to run pipelines
         "research.datasets.read",
         "research.indicators.read",
@@ -78,8 +84,10 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "research.processing.run",
         "research.indicators.read",
         "research.compare.run",
+        "research.forecasts.run",
         "research.exports.create",
         "research.exports.download",
+        "admin.scheduler.read",
         "disaster.alerts.read",
         "disaster.alerts.respond",
         "reports.read",
