@@ -39,6 +39,7 @@ export function DataSourcesPage() {
   const remove = useDeleteDataSource();
 
   const canWrite = can("admin.data_sources.write");
+  const canTest = can("admin.data_sources.test");
   const categories = Array.from(new Set((providers.data ?? []).map((p) => p.category))).sort();
   const [testingId, setTestingId] = useState<number | null>(null);
 
@@ -181,56 +182,62 @@ export function DataSourcesPage() {
                       ) : null}
                     </Td>
                     <Td align="right">
-                      {canWrite ? (
+                      {canWrite || canTest ? (
                         <div className="flex flex-wrap justify-end gap-1">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            loading={testingId === source.id && test.isPending}
-                            onClick={async () => {
-                              setBanner(null);
-                              setTestingId(source.id);
-                              try {
-                                const result = await test.mutateAsync(source.id);
-                                setBanner({
-                                  tone: result.status === "ok" ? "ok" : "error",
-                                  text: `${source.name}: ${result.message}`,
-                                });
-                              } catch (error) {
-                                setBanner({
-                                  tone: "error",
-                                  text: error instanceof ApiError ? error.message : "Test failed.",
-                                });
-                              } finally {
-                                setTestingId(null);
-                              }
-                            }}
-                          >
-                            <RefreshCw size={14} /> Test
-                          </Button>
-                          <Button variant="secondary" size="sm" onClick={() => setEditing(source)}>
-                            Edit
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            title="Delete source"
-                            loading={remove.isPending}
-                            onClick={async () => {
-                              if (!window.confirm(`Delete "${source.name}"? Stored datasets are kept.`)) return;
-                              try {
-                                await remove.mutateAsync(source.id);
-                                setBanner({ tone: "ok", text: `Deleted ${source.name}.` });
-                              } catch (error) {
-                                setBanner({
-                                  tone: "error",
-                                  text: error instanceof ApiError ? error.message : "Delete failed.",
-                                });
-                              }
-                            }}
-                          >
-                            <Trash2 size={14} />
-                          </Button>
+                          {canTest ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={testingId === source.id && test.isPending}
+                              onClick={async () => {
+                                setBanner(null);
+                                setTestingId(source.id);
+                                try {
+                                  const result = await test.mutateAsync(source.id);
+                                  setBanner({
+                                    tone: result.status === "verified" ? "ok" : "error",
+                                    text: `${source.name}: ${result.message}`,
+                                  });
+                                } catch (error) {
+                                  setBanner({
+                                    tone: "error",
+                                    text: error instanceof ApiError ? error.message : "Test failed.",
+                                  });
+                                } finally {
+                                  setTestingId(null);
+                                }
+                              }}
+                            >
+                              <RefreshCw size={14} /> Test
+                            </Button>
+                          ) : null}
+                          {canWrite ? (
+                            <>
+                              <Button variant="secondary" size="sm" onClick={() => setEditing(source)}>
+                                Edit
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                title="Delete source"
+                                loading={remove.isPending}
+                                onClick={async () => {
+                                  if (!window.confirm(`Delete "${source.name}"? Stored datasets are kept.`)) return;
+                                  try {
+                                    await remove.mutateAsync(source.id);
+                                    setBanner({ tone: "ok", text: `Deleted ${source.name}.` });
+                                  } catch (error) {
+                                    setBanner({
+                                      tone: "error",
+                                      text: error instanceof ApiError ? error.message : "Delete failed.",
+                                    });
+                                  }
+                                }}
+                              >
+                                <Trash2 size={14} />
+                              </Button>
+                            </>
+                          ) : null}
                         </div>
                       ) : (
                         <span className="text-xs text-muted">Read only</span>
