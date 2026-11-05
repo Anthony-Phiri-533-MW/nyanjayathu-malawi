@@ -122,8 +122,23 @@ def seed_roles_and_permissions(db: Session) -> None:
 
 
 def seed_default_study_area(db: Session) -> None:
-    exists = db.execute(select(func.count()).select_from(StudyArea)).scalar_one()
-    if exists:
+    default_area = db.execute(
+        select(StudyArea).where(StudyArea.is_default.is_(True))
+    ).scalar_one_or_none()
+    if default_area is not None:
+        if default_area.boundary_geojson != LEGACY_LAKE_MALAWI_BOUNDARY:
+            return
+        from app.services.spatial import geom_bbox, parse_geojson_geometry
+
+        geom = parse_geojson_geometry(LAKE_MALAWI_BOUNDARY, allowed=["Polygon", "MultiPolygon"])
+        default_area.boundary_geojson = LAKE_MALAWI_BOUNDARY
+        default_area.minx, default_area.miny, default_area.maxx, default_area.maxy = geom_bbox(geom)
+        default_area.description = (
+            "Default study area follows the Lake Malawi / Nyasa shoreline polygon (WGS84; "
+            "simplified from OpenStreetMap relation 2631184)."
+        )
+        return
+    if db.execute(select(func.count()).select_from(StudyArea)).scalar_one():
         return
     from app.services.spatial import geom_bbox, parse_geojson_geometry
 
