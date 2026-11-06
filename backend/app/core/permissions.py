@@ -39,7 +39,8 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     # --- Disaster module ---------------------------------------------------
     "disaster.alerts.read": ("View disaster alerts and forecast records", "disaster"),
     "disaster.alerts.respond": ("Acknowledge, annotate and resolve alerts", "disaster"),
-    "disaster.evaluate.run": ("Run threshold evaluations and record forecast values", "disaster"),
+    "disaster.forecasts.write": ("Record manual/external forecast projections with provenance", "disaster"),
+    "disaster.evaluate.run": ("Run threshold evaluations (compare forecasts/observations to thresholds)", "disaster"),
     # --- Report Generation module -------------------------------------------
     "reports.read": ("View generated reports and their summaries", "reports"),
     "reports.create": ("Build periodic and custom reports", "reports"),
@@ -70,6 +71,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         # disaster operations: evaluate, respond, monitor
         "disaster.alerts.read",
         "disaster.alerts.respond",
+        "disaster.forecasts.write",
         "disaster.evaluate.run",
         # reports summarise data administrators can already read
         "reports.read",
@@ -90,6 +92,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "admin.scheduler.read",
         "disaster.alerts.read",
         "disaster.alerts.respond",
+        "disaster.forecasts.write",
         "reports.read",
         "reports.create",
         "reports.download",

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Field, Select, TextArea, TextInput } from "@/components/ui/Field";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/States";
 import { Pagination, Table, Td, Th, Tr } from "@/components/ui/Table";
-import { ApiError, downloadUrl } from "@/lib/api";
+import { ApiError, downloadFile } from "@/lib/api";
 import {
   useCancelReport,
   useCreateReport,
@@ -16,7 +16,7 @@ import {
   useStudyAreas,
 } from "@/lib/hooks";
 import { formatBytes, formatDateTime, statusStyle, titleCase } from "@/lib/format";
-import type { ReportFormat, ReportInput, ReportPeriodType, ReportSection } from "@/lib/types";
+import type { Report, ReportFormat, ReportInput, ReportPeriodType, ReportSection } from "@/lib/types";
 
 /**
  * Mirrors `REPORT_SECTIONS` on the backend. Report files freeze these sections
@@ -41,12 +41,29 @@ export function ReportsPage() {
   const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const reports = useReports({ page, size: 20 });
   const cancel = useCancelReport();
   const retry = useRetryReport();
   const canCreate = can("reports.create");
   const canDownload = can("reports.download");
+
+  // Downloads must go through fetch with the Authorization header — a plain
+  // anchor link would 401 because the JWT lives in localStorage, not cookies.
+  const handleDownload = async (report: Report) => {
+    setDownloadingId(report.id);
+    try {
+      await downloadFile(`/reports/${report.id}/download`, report.file_name ?? undefined);
+    } catch (error) {
+      setBanner({
+        tone: "error",
+        text: error instanceof ApiError ? error.message : "Report download failed.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <div>
@@ -144,12 +161,14 @@ export function ReportsPage() {
                       <Td align="right">
                         <div className="flex items-center justify-end gap-2">
                           {ready ? (
-                            <a
-                              className="btn-secondary inline-flex items-center gap-1 px-2.5 py-1 text-xs"
-                              href={downloadUrl(`/reports/${report.id}/download`)}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              loading={downloadingId === report.id}
+                              onClick={() => void handleDownload(report)}
                             >
                               <Download size={13} /> Download
-                            </a>
+                            </Button>
                           ) : (
                             <span className="text-xs text-muted">
                               {report.status === "completed"

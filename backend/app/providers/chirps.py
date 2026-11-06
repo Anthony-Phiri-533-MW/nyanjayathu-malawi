@@ -110,6 +110,11 @@ class ChirpsAdapter(ProviderAdapter):
                 )
             )
             day += timedelta(days=1)
+        if day <= params.end_date:
+            raise ProviderError(
+                f"CHIRPS date range requires more than the configured item limit ({cap}); "
+                "narrow the date range or increase the source limit"
+            )
         return items
 
     def fetch(self, params: IngestParams, item: DiscoveredItem, progress: ProgressFn = _noop_progress) -> FetchedArtifact:

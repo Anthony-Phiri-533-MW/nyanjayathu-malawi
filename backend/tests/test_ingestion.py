@@ -10,6 +10,9 @@ class _FakeAdapter:
     """Stand-in provider adapter used to simulate discover/fetch outcomes."""
 
     key = "fake_provider"
+    label = "Fake provider"
+    product_type = "fake product"
+    adapter_status = "tested"
 
     def __init__(self, client=None, config=None):
         self.client = client
@@ -116,6 +119,53 @@ def test_ingestion_crud_and_run(
     assert got["id"] == body["id"]
 
 
+def test_successful_ingestion_registers_a_dataset(
+    client: TestClient,
+    admin_headers: dict[str, str],
+    default_study_area: dict,
+    monkeypatch,
+) -> None:
+    from sqlalchemy import select
+
+    from app.core.database import session_scope
+    from app.models import Dataset, DataSource
+    from app.schemas.research import IngestionJobCreate
+    from app.services.ingestion import start_ingestion
+    from app.services.jobs import execute_job_now
+
+    _install_fake_adapter(monkeypatch)
+    source_out = _create_source(client, admin_headers)
+    with session_scope() as db:
+        source = db.get(DataSource, source_out["id"])
+        job, ingestion = start_ingestion(
+            db,
+            payload=IngestionJobCreate(
+                data_source_id=source_out["id"],
+                study_area_id=default_study_area["id"],
+                start_date=date(2026, 1, 1),
+                end_date=date(2026, 1, 2),
+                variables=["blue"],
+            ),
+            actor=None,
+        )
+        db.commit()
+        job_id = job.id
+        ingestion_id = ingestion.id
+
+        finished = execute_job_now(db, job_id)
+        datasets = list(
+            db.execute(
+                select(Dataset).where(Dataset.ingestion_job_id == ingestion_id)
+            ).scalars()
+        )
+
+        assert finished.status == "succeeded"
+        assert len(datasets) == 1
+        assert datasets[0].data_source_id == source.id
+        assert datasets[0].study_area_id == default_study_area["id"]
+        assert datasets[0].file_path
+
+
 def test_ingestion_validation(client: TestClient, admin_headers: dict[str, str], default_study_area: dict) -> None:
     source = _create_source(client, admin_headers)
     sa = default_study_area["id"]
@@ -196,3 +246,28 @@ def test_researcher_ingestion_permissions(
     assert response.status_code == 202, response.text
     # but cannot reach admin-only data-source writes
     assert client.get("/api/v1/admin/data-sources", headers=headers).status_code == 403
+
+
+def test_capability_detection_uses_provider_asset_canonical_names() -> None:
+    from app.services.ingestion import dataset_capabilities
+
+    assert dataset_capabilities(
+        {"standard-measurement": {"canonical": "water_level"}},
+        "sentinel3_sral",
+    ) == ["altimetry"]
+    assert dataset_capabilities(
+        {
+            "LST_Day_1km": {"canonical": "thermal"},
+            "QC_Day": {"canonical": "qa"},
+        },
+        "modis",
+    ) == ["optical_qa", "thermal"]
+    assert dataset_capabilities(
+        {
+            "green": {"canonical": "green"},
+            "swir16": {"canonical": "swir1"},
+            "lwir11": {"canonical": "thermal"},
+            "qa_pixel": {"canonical": "qa"},
+        },
+        "landsat",
+    ) == ["optical", "optical_qa", "thermal"]

@@ -92,6 +92,37 @@ class ForecastRunOut(BaseModel):
     metrics: dict | None = None
 
 
+class LocalModelFeatureOut(BaseModel):
+    key: str
+    label: str
+    unit: str
+
+
+class LocalModelOut(BaseModel):
+    key: str
+    name: str
+    target: str
+    unit: str
+    features: list[LocalModelFeatureOut]
+    metrics: dict[str, float] | None = None
+    metrics_note: str
+    ready: bool
+    unavailable_reason: str | None = None
+
+
+class LocalModelPredictionRequest(BaseModel):
+    features: dict[str, float]
+
+
+class LocalModelPredictionOut(BaseModel):
+    model_key: str
+    model_name: str
+    target: str
+    unit: str
+    value: float
+    features: dict[str, float]
+
+
 # ------------------------------------------------------------------ scheduler
 class SchedulerRunOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

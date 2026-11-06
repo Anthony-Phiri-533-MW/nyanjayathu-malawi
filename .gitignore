@@ -26,6 +26,10 @@ dist/
 
 # --- Misc ---------------------------------------------------------------------
 *.log
+*.bak
+*.tmp
+~WRL*.tmp
+extract.py
 .DS_Store
 Thumbs.db
 

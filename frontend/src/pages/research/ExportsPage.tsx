@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/Button";
 import { Field, Select, TextInput } from "@/components/ui/Field";
 import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/States";
 import { Pagination, Table, Td, Th, Tr } from "@/components/ui/Table";
-import { ApiError, downloadUrl } from "@/lib/api";
+import { ApiError, downloadFile } from "@/lib/api";
 import { useCreateExport, useExports, useIndicatorDefinitions, useStudyAreas } from "@/lib/hooks";
 import { formatBytes, formatDateTime, statusStyle, titleCase } from "@/lib/format";
-import type { ExportFormat, ExportResource } from "@/lib/types";
+import type { ExportFormat, ExportJob, ExportResource } from "@/lib/types";
 
 /**
  * Which formats each resource supports. `raster` copies a GeoTIFF unchanged or
@@ -38,10 +38,27 @@ export function ExportsPage() {
   const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [banner, setBanner] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const exports = useExports({ page, size: 20 });
   const canCreate = can("research.exports.create");
   const canDownload = can("research.exports.download");
+
+  // Downloads must go through fetch with the Authorization header — a plain
+  // anchor link would 401 because the JWT lives in localStorage, not cookies.
+  const handleDownload = async (record: ExportJob) => {
+    setDownloadingId(record.id);
+    try {
+      await downloadFile(`/exports/${record.id}/download`, record.file_name ?? undefined);
+    } catch (error) {
+      setBanner({
+        tone: "error",
+        text: error instanceof ApiError ? error.message : "Export download failed.",
+      });
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   return (
     <div>
@@ -133,12 +150,14 @@ export function ExportsPage() {
                       </Td>
                       <Td align="right">
                         {ready ? (
-                          <a
-                            className="btn-secondary inline-flex items-center gap-1 px-2.5 py-1 text-xs"
-                            href={downloadUrl(`/exports/${record.id}/download`)}
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            loading={downloadingId === record.id}
+                            onClick={() => void handleDownload(record)}
                           >
                             <Download size={13} /> Download
-                          </a>
+                          </Button>
                         ) : (
                           <span className="text-xs text-muted">
                             {jobStatus === "succeeded" ? "Ready" : "Pending"}

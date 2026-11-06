@@ -163,18 +163,13 @@ export function PublicDashboardPage() {
           <CardHeader
             title="Lake Malawi — published observations"
             description="Satellite-derived water extents and study areas. Lake boundary shown for reference."
-            actions={
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-success-light px-2.5 py-1 text-xs font-medium text-success-dark">
-                <span className="h-1.5 w-1.5 rounded-full bg-success" />
-                Live published data
-              </span>
-            }
           />
           <div className="h-[34rem] lg:h-[42rem]">
             <LakeMapPanel
               mapData={map.data}
               waterExtents={waterExtents.data?.items ?? []}
               isLoading={map.isLoading}
+              isTimelineLoading={waterExtents.isLoading}
               mapError={map.error}
               timelineError={waterExtents.error}
               onRetry={() => {

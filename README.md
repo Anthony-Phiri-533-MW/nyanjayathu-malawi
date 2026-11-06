@@ -29,11 +29,11 @@ water quality. This repository implements five of the planned modules end to end
    time-lapse appears only when dated water-extent polygons have been computed
    and their source datasets published.
 
-> **Scope note.** Machine Learning, Report Generation, Public Data and
-> Statistics modules are intentionally **not** part of this build. The platform
-> does not generate forecasts; *projected* values can be recorded manually on
-> the Disaster → Forecast values page (provenance note mandatory), and the
-> alert engine compares them exactly like computed indicator values.
+> **Scope note.** Local model inference is available on the Disaster →
+> Forecasts page for the three supplied Lake Malawi models. It requires users
+> to provide every model input explicitly; the app does not infer missing
+> features from stored datasets or persist these estimates as observations.
+> Separate manual projections still require a provenance note.
 
 ---
 
@@ -120,6 +120,8 @@ cp .env.example .env            # optional; sensible defaults apply
 # create and populate the virtual environment
 uv venv --python 3.12
 uv pip install -e ".[dev]"      # or: uv sync
+# Optional: enable the supplied local ML artifacts
+uv pip install -e ".[local-models]"
 
 # database — pick ONE
 #   a) PostgreSQL + PostGIS (primary)
@@ -140,6 +142,11 @@ uvicorn app.main:app --reload --port 8000
 # optional: run background workers in the foreground instead of in-process
 python -m app.cli worker
 ```
+
+Place the three supplied model artifacts under `backend/ml-models/` using
+their model-specific folders. The Forecasts page reports missing artifacts or
+runtime packages; local predictions require all feature values documented in
+the selected model and are estimates, not automatically persisted forecasts.
 
 ### 3.2 Frontend
 

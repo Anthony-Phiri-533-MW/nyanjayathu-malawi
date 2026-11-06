@@ -47,7 +47,8 @@ class Settings(BaseSettings):
     # --- background jobs --------------------------------------------------
     jobs_enabled: bool = True
     jobs_poll_interval_seconds: float = 2.0
-    jobs_worker_count: int = 2
+    # Worker threads run handlers concurrently; each is lightweight (I/O bound).
+    jobs_worker_count: int = 6
     jobs_max_attempts: int = 3
 
     # --- daily scheduler --------------------------------------------------

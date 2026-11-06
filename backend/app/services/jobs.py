@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.database import session_scope
+from app.core.errors import UnprocessableError
 from app.models import Job, User, utcnow
 from app.services import audit as audit_service
 from app.services.storage import ensure_storage_dirs
@@ -184,7 +185,9 @@ def _run_handler(db, job: Job) -> None:
         job.message = "failed"
         job.finished_at = utcnow()
         job.updated_at = utcnow()
-        retrying = job.attempts < job.max_attempts
+        # Deterministic input errors (UnprocessableError) cannot succeed on
+        # retry — fail immediately instead of burning worker time re-running.
+        retrying = not isinstance(exc, UnprocessableError) and job.attempts < job.max_attempts
         if retrying:
             job.status = "pending"       # will be picked up again by the worker
             job.started_at = None
@@ -233,6 +236,40 @@ def retry_job(db, job: Job) -> Job:
     return job
 
 
+def requeue_stale_running(db) -> int:
+    """Requeue jobs left in ``running`` by a previous process.
+
+    ``claim_next`` only ever claims ``pending`` rows, so a job whose owning
+    worker died mid-flight (server killed during a run, crash, deploy) would
+    otherwise sit in ``running`` forever, poisoning the queue view and its
+    unique dedupe key.  Workers are in-process threads, so at startup no
+    ``running`` row can have a live owner (single-process deployment — see
+    operations docs for the multi-instance caveat).
+
+    Returns the number of jobs requeued (query touched *before* the rename).
+    """
+    stale = db.execute(select(Job).where(Job.status == "running")).scalars().all()
+    count = len(stale)
+    if not stale:
+        return 0
+    for job in stale:
+        job.status = "pending"
+        job.started_at = None
+        job.message = "requeued after restart (previous run was interrupted)"
+        job.updated_at = utcnow()
+    db.commit()
+    log.warning("Requeued %s interrupted job(s) found in 'running'", count)
+    for job in stale:
+        audit_service.record(
+            action="job.requeued_after_restart",
+            resource_type="job",
+            resource_id=job.id,
+            actor_id=job.requested_by_id,
+            message=f"Job {job.id} ({job.kind}) was interrupted by a restart and has been requeued",
+        )
+    return count
+
+
 def _worker_loop(poll_interval: float) -> None:
     while not _stop_event.is_set():
         try:
@@ -253,6 +290,13 @@ def start_workers() -> None:
         return
     ensure_storage_dirs()
     _stop_event.clear()
+    # Jobs abandoned in 'running' by a previous process can never be claimed
+    # again — recover them before the pool starts.
+    try:
+        with session_scope() as db:
+            requeue_stale_running(db)
+    except Exception:
+        log.exception("could not requeue stale running jobs at startup")
     for i in range(max(1, settings.jobs_worker_count)):
         t = threading.Thread(target=_worker_loop, args=(settings.jobs_poll_interval_seconds,), name=f"job-worker-{i}", daemon=True)
         t.start()

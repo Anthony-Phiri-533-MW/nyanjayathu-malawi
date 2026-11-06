@@ -24,7 +24,29 @@ from rasterio.windows import Window, from_bounds, intersection
 from shapely.geometry import mapping
 from shapely.geometry.base import BaseGeometry
 
+from app.core.config import settings
+
 DEFAULT_OUT_DTYPE = "float32"
+
+
+def resolve_raster_path(path: str | Path) -> str:
+    """Turn a stored path reference into something rasterio can open.
+
+    Datasets record granule/product paths in three forms: absolute local
+    paths, http(s) URLs (remote COGs) and storage-relative POSIX paths
+    written by ``app.services.storage.relative`` (``raw/...``, ``processed/...``).
+    Only the third form needs resolving — use the storage root.
+    """
+    as_str = str(path)
+    if as_str.startswith(("http://", "https://", "/vsi")):
+        return as_vsi(as_str)
+    direct = Path(as_str)
+    if direct.is_file():
+        return str(direct)
+    candidate = (Path(settings.storage_root) / direct).resolve()
+    if candidate.is_file():
+        return str(candidate)
+    return as_str
 
 
 @dataclass
@@ -101,8 +123,8 @@ def read_window(
     uses overviews when present) - this bounds memory for large scenes.
     Missing/nodata pixels are represented as NaN; output is always float32.
     """
-    vsi = as_vsi(path) if not Path(str(path)).exists() else str(path)
-    with rasterio.open(vsi) as src:
+    path = resolve_raster_path(path)
+    with rasterio.open(path) as src:
         window = bbox_window(src, bbox_wgs84) if bbox_wgs84 else Window(0, 0, src.width, src.height)
         indexes = indexes or list(range(1, src.count + 1))
         out_shape = None

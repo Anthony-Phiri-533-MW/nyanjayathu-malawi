@@ -26,6 +26,11 @@ router = APIRouter(prefix="/disaster", tags=["disaster"])
 Read = Annotated[set[str], Depends(require_permissions("disaster.alerts.read"))]
 Respond = Annotated[set[str], Depends(require_permissions("disaster.alerts.respond"))]
 Evaluate = Annotated[set[str], Depends(require_permissions("disaster.evaluate.run"))]
+# Recording a manual/external projection is distinct from running threshold
+# evaluation. Accept legacy disaster.evaluate.run for compatibility.
+RecordForecast = Annotated[
+    set[str], Depends(require_permissions("disaster.forecasts.write", "disaster.evaluate.run"))
+]
 
 
 @router.get("/alerts", response_model=Page[AlertOut])
@@ -155,7 +160,7 @@ def list_forecasts(
 def record_forecast(
     payload: ForecastCreate,
     actor: CurrentUser,
-    _perms: Evaluate,
+    _perms: RecordForecast,
     db: Annotated[Session, Depends(get_db)],
 ) -> ForecastOut:
     row = service.record_forecast(db, payload=payload, actor=actor)

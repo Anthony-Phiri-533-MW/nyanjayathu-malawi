@@ -99,6 +99,11 @@ def test_public_dashboard_only_returns_published_spatial_data(
     assert all(frame["dataset_id"] != dataset_id for frame in private_frames)
     private_coverages = client.get("/api/v1/public/map").json()["dataset_coverages"]
     assert all(feature["id"] != dataset_id for feature in private_coverages)
+    private_indicators = client.get("/api/v1/public/map").json()["indicator_observations"]
+    assert all(
+        feature["properties"]["dataset_title"] != "Dashboard map publication probe"
+        for feature in private_indicators
+    )
 
     published = client.patch(
         f"/api/v1/public/datasets/{dataset_id}",
@@ -115,6 +120,27 @@ def test_public_dashboard_only_returns_published_spatial_data(
     coverages = client.get("/api/v1/public/map").json()["dataset_coverages"]
     coverage = next(feature for feature in coverages if feature["id"] == dataset_id)
     assert coverage["geometry"] == _WATER_GEOMETRY
+    observations = client.get("/api/v1/public/map").json()["indicator_observations"]
+    observation = next(
+        feature for feature in observations if feature["properties"]["id"]
+        == frame["id"]
+    )
+    assert observation["properties"]["indicator_key"] == "water_extent"
+    assert observation["properties"]["value"] == 1234.5
+    assert observation["geometry"] == _WATER_GEOMETRY
+    published_area = client.patch(
+        f"/api/v1/public/study-areas/{default_study_area['id']}",
+        json={"is_public": True},
+        headers=admin_headers,
+    )
+    assert published_area.status_code == 200, published_area.text
+    public_area = next(
+        feature
+        for feature in client.get("/api/v1/public/map").json()["features"]
+        if feature["id"] == default_study_area["id"]
+    )
+    assert public_area["properties"]["is_default"] is True
+    assert public_area["geometry"] == default_study_area["boundary_geojson"]
     unpublished = client.patch(
         f"/api/v1/public/datasets/{dataset_id}",
         json={"is_public": False},

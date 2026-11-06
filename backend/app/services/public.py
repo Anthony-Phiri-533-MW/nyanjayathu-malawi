@@ -16,7 +16,15 @@ from sqlalchemy.orm import Session
 
 from app.core.database import count_query
 from app.core.errors import NotFoundError
-from app.models import Alert, Dataset, IndicatorResult, StudyArea, User, utcnow  # noqa: F401  (utcnow re-exported)
+from app.models import (
+    Alert,
+    Dataset,
+    IndicatorDefinition,
+    IndicatorResult,
+    StudyArea,
+    User,
+    utcnow,  # noqa: F401  (utcnow re-exported)
+)
 from app.schemas.public import PublicOverviewAlertTotals
 
 _PROVENANCE = (
@@ -186,6 +194,7 @@ def public_map(db: Session) -> dict[str, Any]:
                     "id": area.id,
                     "name": area.name,
                     "description": area.description,
+                    "is_default": area.is_default,
                     "public_dataset_count": dataset_count,
                     "active_public_alerts": len(alerts),
                     "by_severity": by_severity,
@@ -200,6 +209,39 @@ def public_map(db: Session) -> dict[str, Any]:
             .order_by(Dataset.created_at.desc(), Dataset.id.desc())
         ).scalars()
     )
+    ranked_indicator_ids = (
+        select(
+            IndicatorResult.id.label("result_id"),
+            func.row_number()
+            .over(
+                partition_by=[
+                    IndicatorResult.indicator_key,
+                    IndicatorResult.study_area_id,
+                ],
+                order_by=[
+                    IndicatorResult.observed_start.desc(),
+                    IndicatorResult.id.desc(),
+                ],
+            )
+            .label("result_rank"),
+        )
+        .join(Dataset, Dataset.id == IndicatorResult.dataset_id)
+        .where(
+            Dataset.is_public.is_(True),
+            IndicatorResult.value.is_not(None),
+            IndicatorResult.spatial_extent_geojson.is_not(None),
+        )
+        .subquery()
+    )
+    latest_observations = db.execute(
+        select(IndicatorResult, Dataset, IndicatorDefinition)
+        .join(Dataset, Dataset.id == IndicatorResult.dataset_id)
+        .join(IndicatorDefinition, IndicatorDefinition.id == IndicatorResult.definition_id)
+        .join(ranked_indicator_ids, ranked_indicator_ids.c.result_id == IndicatorResult.id)
+        .where(ranked_indicator_ids.c.result_rank == 1)
+        .order_by(IndicatorDefinition.name, IndicatorResult.study_area_id)
+    ).all()
+
     return {
         "type": "FeatureCollection",
         "features": features,
@@ -218,6 +260,28 @@ def public_map(db: Session) -> dict[str, Any]:
                 },
             }
             for dataset in dataset_coverages
+        ],
+        "indicator_observations": [
+            {
+                "type": "Feature",
+                "id": result.id,
+                "geometry": result.spatial_extent_geojson,
+                "properties": {
+                    "id": result.id,
+                    "indicator_key": result.indicator_key,
+                    "indicator_name": definition.name,
+                    "category": definition.category,
+                    "is_proxy": definition.is_proxy,
+                    "value": result.value,
+                    "unit": result.unit,
+                    "observed_start": result.observed_start,
+                    "observed_end": result.observed_end,
+                    "quality_flag": result.quality_flag,
+                    "study_area_id": result.study_area_id,
+                    "dataset_title": dataset.title,
+                },
+            }
+            for result, dataset, definition in latest_observations
         ],
         "generated_at": datetime.now(UTC),
         "provenance": _PROVENANCE,

@@ -215,7 +215,7 @@ def clear_mask_for(reads: dict[str, RasterRead], sensor: str) -> tuple[np.ndarra
         return cm.landsat_qa_clear_mask(qa), "Landsat QA_PIXEL bits"
     if sensor == "modis":
         native = qa_read.band_names[0] if qa_read.band_names else ""
-        if native == "QC_1km":
+        if native in ("QC_1km", "QC_Day"):
             return cm.modis_lst_qc_clear_mask(qa), "MODIS LST QC_1km bits"
         return cm.modis_state_clear_mask(qa), "MODIS state QA bits"
     return None, f"none (no cloud rule for sensor '{sensor}')"

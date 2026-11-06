@@ -13,9 +13,9 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from app.core.config import settings
 from app.providers.base import (
@@ -60,6 +60,8 @@ class MpcStacAdapter(ProviderAdapter):
     stac_search_limit_cap: int = 100
     # asset key -> conversion rule (documented product scaling)
     asset_rules: dict[str, AssetRule] = {}
+    # Older source configurations may still use mission/product band names.
+    asset_aliases: dict[str, str] = {}
     # default asset selection for ingestion when the caller names none
     default_assets: list[str] = []
     qa_assets: list[str] = []
@@ -74,20 +76,78 @@ class MpcStacAdapter(ProviderAdapter):
     def _sas_url(self) -> str:
         return str(self.config.get("sas_url") or settings.planetary_computer_sas_url).rstrip("/")
 
-    def _search(self, body: dict[str, Any]) -> list[dict[str, Any]]:
-        try:
-            resp = self.client.post(f"{self._stac_url()}/search", json=body)
-        except Exception as exc:  # httpx transport errors
-            raise ProviderError(f"STAC search unreachable: {exc}") from exc
-        if resp.status_code != 200:
-            raise ProviderError(
-                f"STAC search returned HTTP {resp.status_code}: {resp.text[:300]}"
+    def _search(
+        self, body: dict[str, Any], *, max_items: int | None = None
+    ) -> list[dict[str, Any]]:
+        search_url = f"{self._stac_url()}/search"
+        request_url = search_url
+        request_method = "POST"
+        request_body: dict[str, Any] | None = body
+        request_params = None
+        request_headers = None
+        features: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+
+        while True:
+            try:
+                if request_method == "POST":
+                    resp = self.client.post(
+                        request_url,
+                        json=request_body,
+                        headers=request_headers,
+                    )
+                else:
+                    resp = self.client.get(
+                        request_url,
+                        params=request_params,
+                        headers=request_headers,
+                    )
+            except Exception as exc:  # httpx transport errors
+                raise ProviderError(f"STAC search unreachable: {exc}") from exc
+            if resp.status_code != 200:
+                raise ProviderError(
+                    f"STAC search returned HTTP {resp.status_code}: {resp.text[:300]}"
+                )
+            try:
+                payload = resp.json()
+            except ValueError as exc:
+                raise ProviderError("STAC search returned non-JSON body") from exc
+
+            for feature in payload.get("features") or []:
+                item_id = str(feature.get("id") or "")
+                if not item_id or item_id not in seen_ids:
+                    features.append(feature)
+                    if item_id:
+                        seen_ids.add(item_id)
+            if max_items is not None and len(features) > max_items:
+                raise ProviderError(
+                    f"STAC returned more than the configured ingestion limit ({max_items}); "
+                    "narrow the date range or increase the source limit"
+                )
+            next_link = next(
+                (link for link in payload.get("links") or [] if link.get("rel") == "next"),
+                None,
             )
-        try:
-            payload = resp.json()
-        except ValueError as exc:
-            raise ProviderError("STAC search returned non-JSON body") from exc
-        return list(payload.get("features") or [])
+            if next_link is None:
+                return features
+            if max_items is not None and len(features) >= max_items:
+                raise ProviderError(
+                    f"STAC results exceed the configured ingestion limit ({max_items}); "
+                    "narrow the date range or increase the source limit"
+                )
+
+            next_url = urljoin(search_url, str(next_link.get("href") or ""))
+            base = urlparse(self._stac_url())
+            target = urlparse(next_url)
+            if target.scheme != base.scheme or target.netloc != base.netloc:
+                raise ProviderError("STAC pagination returned a link outside the configured service")
+            request_url = next_url
+            request_method = str(next_link.get("method") or "GET").upper()
+            if request_method not in ("GET", "POST"):
+                raise ProviderError(f"STAC pagination uses unsupported method '{request_method}'")
+            request_body = next_link.get("body") if request_method == "POST" else None
+            request_params = next_link.get("body") if request_method == "GET" else None
+            request_headers = next_link.get("headers") or None
 
     def _sas_token(self) -> str:
         cached, expires = getattr(self, "_token", ""), getattr(self, "_token_expires", 0.0)
@@ -109,8 +169,22 @@ class MpcStacAdapter(ProviderAdapter):
             raise ProviderError("SAS token endpoint returned non-JSON body") from exc
         if not token:
             raise ProviderError("SAS token endpoint returned an empty token")
+        token_params = parse_qs(token.lstrip("?&"))
+        try:
+            starts_at = datetime.fromisoformat(token_params["st"][0].replace("Z", "+00:00")).timestamp()
+            expires_at = datetime.fromisoformat(token_params["se"][0].replace("Z", "+00:00")).timestamp()
+        except (KeyError, IndexError, ValueError) as exc:
+            raise ProviderError("SAS token endpoint returned a token without valid start/expiry times") from exc
+        now = time.time()
+        if expires_at <= now:
+            raise ProviderError("SAS token endpoint returned an expired token")
+        if starts_at > now:
+            time.sleep(min(SAS_TOKEN_DELAY, starts_at - now + 0.1))
+            now = time.time()
+            if starts_at > now:
+                raise ProviderError("SAS token is not valid yet")
         self._token = token
-        self._token_expires = time.time() + _SAS_CACHE_SECONDS
+        self._token_expires = min(now + _SAS_CACHE_SECONDS, expires_at - 60)
         return token
 
     def sign_href(self, href: str) -> str:
@@ -127,33 +201,75 @@ class MpcStacAdapter(ProviderAdapter):
     def test_connection(self) -> TestResult:
         started = time.perf_counter()
         bbox = list(self.config.get("test_bbox") or [33.8, -14.7, 35.5, -9.6])
+        sample_end = date.today() - timedelta(days=2)
+        sample_start = sample_end - timedelta(days=90)
         body = {
             "collections": [self._collection()],
             "bbox": bbox,
-            "datetime": "2024-01-01T00:00:00Z/2024-01-31T23:59:59Z",
+            "datetime": (
+                f"{sample_start.isoformat()}T00:00:00Z/"
+                f"{sample_end.isoformat()}T23:59:59Z"
+            ),
             "limit": 1,
         }
         features = self._search(body)
+        if not features:
+            return TestResult(
+                ok=False,
+                message=f"STAC search found no sample item for collection '{self._collection()}'",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                details={"collection": self._collection()},
+            )
+        assets = features[0].get("assets") or {}
+        preferred = [assets[key] for key in self.default_assets if key in assets]
+        candidate = next(iter(preferred or assets.values()), None)
+        if not candidate or not candidate.get("href"):
+            return TestResult(
+                ok=False,
+                message=f"STAC sample item for collection '{self._collection()}' has no retrievable assets",
+                latency_ms=int((time.perf_counter() - started) * 1000),
+                details={"collection": self._collection()},
+            )
+        try:
+            signed = self.sign_href(str(candidate["href"]))
+            with self.client.stream("GET", signed, headers={"Range": "bytes=0-0"}) as response:
+                asset_ok = response.status_code in (200, 206)
+                if asset_ok:
+                    next(response.iter_bytes(), b"")
+                else:
+                    message = f"Signed asset request returned HTTP {response.status_code}"
+        except Exception as exc:
+            asset_ok = False
+            message = f"Signed asset request failed ({type(exc).__name__})"
         latency = int((time.perf_counter() - started) * 1000)
-        message = (
-            f"STAC search ok for collection '{self._collection()}' "
-            f"({len(features)} item(s) in the sample window over the study area)"
+        if asset_ok:
+            message = (
+                f"STAC search and signed asset access succeeded for collection "
+                f"'{self._collection()}'"
+            )
+        return TestResult(
+            ok=asset_ok,
+            message=message,
+            latency_ms=latency,
+            details={"collection": self._collection(), "sample_items": len(features)},
         )
-        return TestResult(ok=True, message=message, latency_ms=latency, details={"collection": self._collection()})
 
     def discover(self, params: IngestParams) -> list[DiscoveredItem]:
         collection = self._collection()
-        limit = max(1, min(int(params.max_items or 20), self.stac_search_limit_cap))
+        max_items = max(1, int(params.max_items or self.stac_search_limit_cap))
         body: dict[str, Any] = {
             "collections": [collection],
             "datetime": (
                 f"{params.start_date.isoformat()}T00:00:00Z/{params.end_date.isoformat()}T23:59:59Z"
             ),
-            "limit": limit,
+            "limit": min(max_items, self.stac_search_limit_cap),
         }
-        if params.bbox:
+        intersects = (params.extra or {}).get("intersects")
+        if intersects:
+            body["intersects"] = intersects
+        elif params.bbox:
             body["bbox"] = list(params.bbox)
-        features = self._search(body)
+        features = self._search(body, max_items=max_items)
 
         items: list[DiscoveredItem] = []
         for feature in features:
@@ -205,7 +321,13 @@ class MpcStacAdapter(ProviderAdapter):
         from app.services.storage import new_workspace, relative
 
         requested = list(params.variables or [])
-        selected = [k for k in (requested or self.default_assets) if k in item.assets]
+        selected = list(
+            dict.fromkeys(
+                self.asset_aliases.get(key, key)
+                for key in (requested or self.default_assets)
+                if self.asset_aliases.get(key, key) in item.assets
+            )
+        )
         if not selected:
             selected = [k for k in self.default_assets if k in item.assets]
         if not selected:
@@ -263,13 +385,21 @@ class MpcStacAdapter(ProviderAdapter):
                         "shape": None,
                         "unit": rule.unit,
                         "label": rule.label,
+                        "canonical": rule.canonical,
                         "scale": 1.0,
                         "offset": 0.0,
                     }
                     progress((idx + 1) / n, f"retrieved {asset_key} (raw)")
                     continue
                 stored[asset_key] = dest
-                bands[asset_key] = {**meta, "unit": rule.unit, "label": rule.label, "scale": 1.0, "offset": 0.0}
+                bands[asset_key] = {
+                    **meta,
+                    "unit": rule.unit,
+                    "label": rule.label,
+                    "canonical": rule.canonical,
+                    "scale": 1.0,
+                    "offset": 0.0,
+                }
             else:
                 size, _ = download_file(self.client, signed, dest)
                 total_size += size
@@ -418,19 +548,20 @@ class Sentinel2Mpc(MpcStacAdapter):
 
 # ----------------------------------------------------------------------
 # Landsat Collection 2 Level-2 (30 m surface reflectance + 100 m thermal)
-LANDSAT_ASSETS = ["SR_B2", "SR_B3", "SR_B4", "SR_B5", "SR_B6", "SR_B7", "ST_B10"]
+LANDSAT_ASSETS = ["blue", "green", "red", "nir08", "swir16", "swir22", "lwir11"]
 LANDSAT_RULES = {
-    # USGS Landsat C2 L2: SR = DN * 2.75e-05 - 0.2 (surface reflectance)
-    "SR_B2": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Blue (SR_B2)", canonical="blue"),
-    "SR_B3": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Green (SR_B3)", canonical="green"),
-    "SR_B4": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Red (SR_B4)", canonical="red"),
-    "SR_B5": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="NIR (SR_B5)", canonical="nir"),
-    "SR_B6": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="SWIR 1 (SR_B6)", canonical="swir1"),
-    "SR_B7": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="SWIR 2 (SR_B7)", canonical="swir2"),
-    # USGS thermal scaling: T(K) = DN * 0.00341802 + 149.0
-    "ST_B10": AssetRule(scale=0.00341802, offset=149.0, unit="K", label="Surface temperature (ST_B10)", canonical="thermal"),
-    # QA bits: integer, never scaled
-    "QA_PIXEL": AssetRule(unit="bits", label="Pixel QA (QA_PIXEL)", resampling="nearest", qa=True, canonical="qa"),
+    # Planetary Computer's STAC assets use names that differ from the USGS band labels.
+    # USGS C2 L2 SR = DN * 2.75e-05 - 0.2.
+    "blue": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Blue", canonical="blue"),
+    "green": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Green", canonical="green"),
+    "red": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="Red", canonical="red"),
+    "nir08": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="NIR", canonical="nir"),
+    "swir16": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="SWIR 1", canonical="swir1"),
+    "swir22": AssetRule(scale=2.75e-05, offset=-0.2, unit="reflectance", label="SWIR 2", canonical="swir2"),
+    # USGS thermal scaling: T(K) = DN * 0.00341802 + 149.0.
+    "lwir11": AssetRule(scale=0.00341802, offset=149.0, unit="K", label="Surface temperature", canonical="thermal"),
+    # QA bits are stored unchanged and resampled with nearest-neighbour.
+    "qa_pixel": AssetRule(unit="bits", label="Pixel QA", resampling="nearest", qa=True, canonical="qa"),
 }
 
 
@@ -448,7 +579,17 @@ class LandsatMpc(MpcStacAdapter):
     verification_note = "STAC search, SAS token signing and signed-asset access verified live (2026-10-21)."
     collection = "landsat-c2-l2"
     default_assets = LANDSAT_ASSETS
-    qa_assets = ["QA_PIXEL"]
+    asset_aliases = {
+        "SR_B2": "blue",
+        "SR_B3": "green",
+        "SR_B4": "red",
+        "SR_B5": "nir08",
+        "SR_B6": "swir16",
+        "SR_B7": "swir22",
+        "ST_B10": "lwir11",
+        "QA_PIXEL": "qa_pixel",
+    }
+    qa_assets = ["qa_pixel"]
     asset_rules = LANDSAT_RULES
     capabilities = {
         "stac_search": True,
@@ -478,7 +619,7 @@ MODIS_RULES = {
     "sur_refl_b04": AssetRule(scale=0.0001, unit="reflectance", label="Green (b04)", canonical="green"),
     "sur_refl_b06": AssetRule(scale=0.0001, unit="reflectance", label="SWIR 1 (b06)", canonical="swir1"),
     "sur_refl_b07": AssetRule(scale=0.0001, unit="reflectance", label="SWIR 2 (b07)", canonical="swir2"),
-    "state_1km_16days": AssetRule(unit="bits", label="State QA (state_1km_16days)", resampling="nearest", qa=True, canonical="qa"),
+    "sur_refl_state_500m": AssetRule(unit="bits", label="Surface reflectance state QA", resampling="nearest", qa=True, canonical="qa"),
 }
 
 
@@ -496,7 +637,7 @@ class ModisMpc(MpcStacAdapter):
     verification_note = "STAC search, SAS token signing and signed-asset access verified live (2026-10-21)."
     collection = "modis-09A1-061"
     default_assets = MODIS_ASSETS
-    qa_assets = ["state_1km_16days"]
+    qa_assets = ["sur_refl_state_500m"]
     asset_rules = MODIS_RULES
     capabilities = {
         "stac_search": True,
@@ -518,8 +659,8 @@ class ModisMpc(MpcStacAdapter):
 # MODIS MOD11A2 8-day land surface temperature (1 km)
 MODIS_LST_RULES = {
     # MOD11A2 C6.1: LST(K) = DN * 0.02 (valid range 7500-65535)
-    "LST_1km": AssetRule(scale=0.02, unit="K", label="Daytime LST (LST_1km)", canonical="thermal"),
-    "QC_1km": AssetRule(unit="bits", label="LST QC (QC_1km)", resampling="nearest", qa=True, canonical="qa"),
+    "LST_Day_1km": AssetRule(scale=0.02, unit="K", label="Daytime LST (LST_Day_1km)", canonical="thermal"),
+    "QC_Day": AssetRule(unit="bits", label="Daytime LST QC (QC_Day)", resampling="nearest", qa=True, canonical="qa"),
 }
 
 
@@ -536,8 +677,12 @@ class ModisLstMpc(MpcStacAdapter):
     adapter_status = "tested"
     verification_note = "STAC collection lookup verified live (2026-10-21); SAS signing shared with other MPC adapters."
     collection = "modis-11A2-061"
-    default_assets = ["LST_1km"]
-    qa_assets = ["QC_1km"]
+    default_assets = ["LST_Day_1km"]
+    asset_aliases = {
+        "LST_1km": "LST_Day_1km",
+        "QC_1km": "QC_Day",
+    }
+    qa_assets = ["QC_Day"]
     asset_rules = MODIS_LST_RULES
     capabilities = {
         "stac_search": True,
@@ -557,7 +702,7 @@ class ModisLstMpc(MpcStacAdapter):
 # ----------------------------------------------------------------------
 # Sentinel-3 SRAL water-level (altimetry) netCDF
 SRAL_RULES = {
-    "wat_meas": AssetRule(unit="m", label="Water measurement (netCDF)", canonical="water_level"),
+    "standard-measurement": AssetRule(unit="m", label="Standard water-level measurement (netCDF)", canonical="water_level"),
 }
 
 
@@ -575,7 +720,11 @@ class Sentinel3SralMpc(MpcStacAdapter):
     adapter_status = "tested"
     verification_note = "STAC search, SAS token signing and signed-asset access verified live (2026-10-21)."
     collection = "sentinel-3-sral-wat-l2-netcdf"
-    default_assets = ["wat_meas"]
+    default_assets = ["standard-measurement"]
+    asset_aliases = {
+        "wat_meas": "standard-measurement",
+        "water_level": "standard-measurement",
+    }
     qa_assets = []
     asset_rules = SRAL_RULES
     capabilities = {

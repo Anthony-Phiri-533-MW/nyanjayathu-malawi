@@ -168,3 +168,43 @@ export function downloadUrl(path: string): string {
   const base = API_BASE_URL.replace(/\/$/, "");
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
+
+/**
+ * Download an authenticated file (report/export endpoints require the
+ * Authorization header, so a plain anchor link would 401): fetch with the
+ * stored token, then save the blob with the server-suggested filename.
+ */
+export async function downloadFile(path: string, fallbackName?: string): Promise<void> {
+  const token = getStoredToken();
+  const response = await fetch(downloadUrl(path), {
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+
+  if (response.status === 401) onUnauthorized?.();
+  if (!response.ok) {
+    const text = await response.text();
+    throw new ApiError(response.status, extractError(safeJson(text), response.status));
+  }
+
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  let filename = fallbackName || "download";
+  if (match?.[1]) {
+    try {
+      filename = decodeURIComponent(match[1]);
+    } catch {
+      filename = match[1];
+    }
+  }
+
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}

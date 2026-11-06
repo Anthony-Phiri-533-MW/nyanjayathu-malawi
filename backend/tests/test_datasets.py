@@ -52,11 +52,16 @@ def test_list_datasets_and_filters(
     for item in listed["items"]:
         assert "title" in item and "quality_flag" in item and "provider_key" in item
 
-    # search filter
+    # search filter — search matches title, provider_key or product_type
     listed = client.get(
         "/api/v1/datasets", params={"search": "Sentinel", "size": 50}, headers=admin_headers
     ).json()
-    assert all("Sentinel" in i["title"] for i in listed["items"])
+    assert all(
+        "Sentinel" in i["title"]
+        or "sentinel" in (i["provider_key"] or "").lower()
+        or "sentinel" in (i.get("product_type") or "").lower()
+        for i in listed["items"]
+    )
 
     # provider filter
     listed = client.get(

@@ -270,9 +270,13 @@ def compute_water_level_altimetry(ctx: IndicatorContext) -> list[IndicatorResult
         granules = (dataset.metadata_json or {}).get("granules") or []
         for granule in granules:
             any_granule = True
-            path_rel = (granule.get("bands") or {}).get("wat_meas") or (
-                granule.get("bands") or {}
-            ).get("water_level") or granule.get("path")
+            granule_bands = granule.get("bands") or {}
+            path_rel = (
+                granule_bands.get("wat_meas")
+                or granule_bands.get("water_level")
+                or next(iter(granule_bands.values()), None)
+                or granule.get("path")
+            )
             observed = parse_date(granule.get("date")) or dataset.start_date
             start = observed or ctx.selection.start or date.today()
             end = observed or dataset.end_date or start

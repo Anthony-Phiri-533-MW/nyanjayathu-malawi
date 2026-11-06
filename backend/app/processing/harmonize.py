@@ -18,22 +18,31 @@ import numpy as np
 
 # canonical band name -> per-sensor native band names
 BAND_GRID: dict[str, dict[str, list[str]]] = {
-    "blue": {"sentinel2": ["B02"], "landsat": ["SR_B2", "B2"], "modis": ["sur_refl_b03"]},
-    "green": {"sentinel2": ["B03"], "landsat": ["SR_B3", "B3"], "modis": ["sur_refl_b04"]},
-    "red": {"sentinel2": ["B04"], "landsat": ["SR_B4", "B4"], "modis": ["sur_refl_b01"]},
-    "nir": {"sentinel2": ["B08"], "landsat": ["SR_B5", "B5"], "modis": ["sur_refl_b02"]},
-    "swir1": {"sentinel2": ["B11"], "landsat": ["SR_B6", "B6"], "modis": ["sur_refl_b06"]},
-    "swir2": {"sentinel2": ["B12"], "landsat": ["SR_B7", "B7"], "modis": ["sur_refl_b07"]},
+    "blue": {"sentinel2": ["B02"], "landsat": ["SR_B2", "B2", "blue"], "modis": ["sur_refl_b03"]},
+    "green": {"sentinel2": ["B03"], "landsat": ["SR_B3", "B3", "green"], "modis": ["sur_refl_b04"]},
+    "red": {"sentinel2": ["B04"], "landsat": ["SR_B4", "B4", "red"], "modis": ["sur_refl_b01"]},
+    "nir": {"sentinel2": ["B08"], "landsat": ["SR_B5", "B5", "nir08"], "modis": ["sur_refl_b02"]},
+    "swir1": {"sentinel2": ["B11"], "landsat": ["SR_B6", "B6", "swir16"], "modis": ["sur_refl_b06"]},
+    "swir2": {"sentinel2": ["B12"], "landsat": ["SR_B7", "B7", "swir22"], "modis": ["sur_refl_b07"]},
     "red_edge_1": {"sentinel2": ["B05"], "landsat": [], "modis": []},
     "qa": {
         "sentinel2": ["SCL"],
-        "landsat": ["QA_PIXEL"],
-        "modis": ["state_1km_16days", "sur_refl_state_1km", "QC_1km", "QC_500m_8days"],
+        "landsat": ["QA_PIXEL", "qa_pixel"],
+        "modis": [
+            "state_1km_16days",
+            "sur_refl_state_1km",
+            "sur_refl_state_500m",
+            "QC_1km",
+            "QC_Day",
+            "QC_500m_8days",
+        ],
     },
-    "thermal": {"sentinel2": [], "landsat": ["ST_B10"], "modis": ["LST_1km"]},
+    "thermal": {"sentinel2": [], "landsat": ["ST_B10", "lwir11"], "modis": ["LST_1km", "LST_Day_1km"]},
     "precipitation": {"chirps": ["precip", "precipitation"], "nasa_power": ["PRECTOTCORR"]},
     "air_temperature": {"nasa_power": ["T2M"]},
-    "water_level": {"sentinel3_sral": ["wat_meas"]},
+    # SRAL adapter writes band key 'standard-measurement' for the
+    # netCDF standard-measurement measurement dataset (alias 'wat_meas')
+    "water_level": {"sentinel3_sral": ["wat_meas", "standard-measurement"]},
 }
 
 

@@ -1286,6 +1286,7 @@ export function DashboardPage() {
           mapData={map.data}
           waterExtents={waterExtents.data?.items ?? []}
           isLoading={map.isLoading}
+          isTimelineLoading={waterExtents.isLoading}
           mapError={map.error}
           timelineError={waterExtents.error}
           onRetry={() => {

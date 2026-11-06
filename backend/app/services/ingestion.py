@@ -66,7 +66,12 @@ def sensor_for(provider_key: str) -> str:
 def dataset_capabilities(bands: dict[str, Any], sensor: str) -> list[str]:
     from app.processing import harmonize as hz
 
-    canonicals = {hz.canonical_for_sensor(sensor, native) or native for native in bands}
+    canonicals = {
+        (meta.get("canonical") if isinstance(meta, dict) else None)
+        or hz.canonical_for_sensor(sensor, native)
+        or native
+        for native, meta in bands.items()
+    }
     return [cap for cap, keys in CAPABILITY_CANONICALS.items() if canonicals & keys]
 
 
@@ -324,10 +329,11 @@ def run_ingestion(
         variables=variables,
         study_area_id=sa.id,
         dest_dir=dest_root,
-        max_items=int(cfg.get("max_items") or 60),
+        max_items=int(cfg.get("max_items") or 500),
         extra={
             "max_dim": int(cfg.get("max_dim") or 2048),
             "ingestion_config": cfg,
+            "intersects": sa.boundary_geojson,
         },
     )
 
@@ -382,8 +388,13 @@ def run_ingestion(
     data_sources_service.record_ingestion_outcome(
         db,
         ds=ds,
-        ok=ok,
-        error=None if ok else (errors[0]["error"] if errors else "no datasets stored"),
+        ok=ok and not errors,
+        error=(
+            "; ".join(error["error"] for error in errors[:5])[:4000]
+            if errors
+            else None if ok
+            else "no datasets stored"
+        ),
     )
     db.commit()
 

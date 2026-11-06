@@ -15,6 +15,7 @@ import logging
 from datetime import date, timedelta
 from typing import Any
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -256,7 +257,7 @@ def run_daily_pipeline(
             actor=actor,
         )
         db.commit()
-        summary["alerts"] = evaluated.model_dump()
+        summary["alerts"] = evaluated.model_dump(mode="json")
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         summary["alerts"] = {"status": "failed", "error": f"{type(exc).__name__}: {exc}"[:600]}
@@ -291,6 +292,6 @@ def handle_daily_pipeline(ctx: JobContext) -> dict:
     if run is not None:
         run.status = "succeeded"
         run.finished_at = utcnow()
-        run.summary_json = summary
+        run.summary_json = jsonable_encoder(summary)
         ctx.db.commit()
     return summary

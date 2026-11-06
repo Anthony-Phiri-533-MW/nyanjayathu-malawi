@@ -22,6 +22,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import numpy as np
@@ -58,6 +59,12 @@ class AssetRule:
     canonical: str = ""          # expected canonical band name (informational)
 
 
+def _safe_url_for_error(url: str) -> str:
+    parts = urlsplit(url)
+    safe_query = "[redacted]" if parts.query else ""
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, safe_query, ""))
+
+
 def download_file(
     client: httpx.Client,
     url: str,
@@ -78,7 +85,7 @@ def download_file(
             with client.stream("GET", url) as resp:
                 if resp.status_code != 200:
                     raise ProviderError(
-                        f"HTTP {resp.status_code} while downloading {url[:220]}"
+                        f"HTTP {resp.status_code} while downloading {_safe_url_for_error(url)[:220]}"
                     )
                 h = hashlib.sha256()
                 size = 0

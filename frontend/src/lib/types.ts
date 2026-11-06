@@ -649,6 +649,7 @@ export interface PublicMapFeature {
     id: number;
     name: string;
     description: string;
+    is_default: boolean;
     public_dataset_count: number;
     active_public_alerts: number;
     by_severity: Record<string, number>;
@@ -661,8 +662,29 @@ export interface PublicMapCollection {
   type: "FeatureCollection";
   features: PublicMapFeature[];
   dataset_coverages: PublicDatasetCoverage[];
+  indicator_observations?: PublicIndicatorObservation[];
   generated_at: string;
   provenance: string;
+}
+
+export interface PublicIndicatorObservation {
+  type: "Feature";
+  id: number;
+  geometry: GeoJSONGeometry;
+  properties: {
+    id: number;
+    indicator_key: string;
+    indicator_name: string;
+    category: string;
+    is_proxy: boolean;
+    value: number;
+    unit: string;
+    observed_start: string;
+    observed_end: string;
+    quality_flag: string;
+    study_area_id: number | null;
+    dataset_title: string;
+  };
 }
 
 export interface PublicDatasetCoverage {
@@ -729,6 +751,15 @@ export interface ForecastValue {
   value: number;
   unit: string;
   note: string;
+  source: "manual" | "model";
+  model_id: number | null;
+  model_name: string | null;
+  model_algorithm: string | null;
+  run_id: number | null;
+  lead_time_days: number;
+  lower: number | null;
+  upper: number | null;
+  issued_at: string | null;
   created_at: string;
   created_by_email: string | null;
 }
@@ -741,6 +772,98 @@ export type ForecastInput = {
   unit: string;
   note: string;
 };
+
+// ---------------------------------------------------------------- ML forecasting (research API: /api/v1/forecasts/*)
+export interface MLModel {
+  id: number;
+  key: string;
+  name: string;
+  algorithm: string;
+  version: string;
+  indicator_key: string;
+  study_area_id: number | null;
+  study_area_name: string | null;
+  cadence: string;
+  n_lags: number;
+  feature_names: unknown;
+  params: Record<string, unknown> | null;
+  train_start: string | null;
+  train_end: string | null;
+  n_train: number;
+  metrics: Record<string, unknown> | null;
+  rmse: number | null;
+  mae: number | null;
+  bias: number | null;
+  skill_score: number | null;
+  artifact_sha256: string | null;
+  is_active: boolean;
+  trained_at: string;
+}
+
+export interface ModelEvaluation {
+  id: number;
+  model_id: number;
+  indicator_key: string;
+  study_area_id: number | null;
+  fold: number;
+  horizon_days: number;
+  train_start: string | null;
+  train_end: string | null;
+  test_start: string | null;
+  test_end: string | null;
+  n_train: number;
+  n_test: number;
+  rmse: number | null;
+  mae: number | null;
+  bias: number | null;
+  mape: number | null;
+  r2: number | null;
+  skill_score: number | null;
+  coverage: number | null;
+  metrics: Record<string, unknown> | null;
+}
+
+export interface ForecastRun {
+  id: number;
+  study_area_id: number;
+  study_area_name: string | null;
+  indicator_key: string;
+  model_id: number | null;
+  status: string;
+  horizon_days: number;
+  issued_at: string;
+  finished_at: string | null;
+  row_count: number;
+  message: string;
+  metrics: Record<string, unknown> | null;
+}
+
+export interface LocalModelFeature {
+  key: string;
+  label: string;
+  unit: string;
+}
+
+export interface LocalModel {
+  key: string;
+  name: string;
+  target: string;
+  unit: string;
+  features: LocalModelFeature[];
+  metrics: Record<string, number> | null;
+  metrics_note: string;
+  ready: boolean;
+  unavailable_reason: string | null;
+}
+
+export interface LocalModelPrediction {
+  model_key: string;
+  model_name: string;
+  target: string;
+  unit: string;
+  value: number;
+  features: Record<string, number>;
+}
 
 export interface AlertRecord {
   id: number;

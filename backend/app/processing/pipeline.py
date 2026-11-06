@@ -427,7 +427,11 @@ def _op_cloud_mask(state: PipelineState, params: dict) -> tuple[PipelineState, d
             clear = cm.landsat_qa_clear_mask(qa)
         elif sensor == "modis":
             native = qa_read.band_names[0]
-            clear = cm.modis_lst_qc_clear_mask(qa) if native == "QC_1km" else cm.modis_state_clear_mask(qa)
+            clear = (
+                cm.modis_lst_qc_clear_mask(qa)
+                if native in ("QC_1km", "QC_Day")
+                else cm.modis_state_clear_mask(qa)
+            )
         else:
             raise UnprocessableError(f"no cloud-mask rule implemented for sensor '{sensor}'")
         footprint = np.isfinite(np.stack([r.data[0] for r in obs.values()])).any(axis=0)

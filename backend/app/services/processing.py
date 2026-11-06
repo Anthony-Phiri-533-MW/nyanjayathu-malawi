@@ -48,6 +48,33 @@ def _params_hash(params: dict[str, Any], output_name: str) -> str:
     return hashlib.sha256(payload.encode()).hexdigest()[:16]
 
 
+def _raster_readiness_issues(datasets: list[Dataset]) -> list[str]:
+    """Datasets whose granules are not raster-reprocessable.
+
+    Sentinel-3 SRAL granules are netCDF point measurements — raster
+    preprocessing operations (validate/clip/composites/…) cannot apply, and
+    attempting one previously surfaced as an opaque
+    ``rasterio.errors.RasterioIOError`` retried to exhaustion.  Altimetry
+    datasets belong in *indicator* computation (``water_level_altimetry``).
+    """
+    issues: list[str] = []
+    for dataset in datasets:
+        granules = ((dataset.metadata_json or {}).get("granules")) or []
+        paths = [
+            str(path)
+            for granule in granules
+            for path in (granule.get("bands") or {}).values()
+            if isinstance(path, str)
+        ]
+        if paths and all(p.endswith(".nc") for p in paths):
+            issues.append(
+                f"Dataset {dataset.id} ('{dataset.title}') stores netCDF point "
+                "measurements, not rasters; raster preprocessing does not apply. "
+                "Compute the water_level_altimetry indicator on it instead."
+            )
+    return issues
+
+
 def start_processing(
     db,
     *,
@@ -61,6 +88,14 @@ def start_processing(
     missing = sorted(set(payload.dataset_ids) - {d.id for d in datasets})
     if missing:
         raise NotFoundError(f"Datasets not found: {missing}")
+
+    readiness = _raster_readiness_issues(datasets)
+    if readiness:
+        raise UnprocessableError(
+            "Some selected datasets cannot be preprocessed with raster "
+            "operations",
+            details={"issues": readiness},
+        )
 
     if study_area_id is None:
         implied = {d.study_area_id for d in datasets if d.study_area_id}

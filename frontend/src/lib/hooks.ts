@@ -32,6 +32,7 @@ import type {
   ExportInput,
   ExportJob,
   ForecastInput,
+  ForecastRun,
   ForecastValue,
   IndicatorComputeInput,
   IndicatorDefinition,
@@ -39,7 +40,11 @@ import type {
   IngestionInput,
   IngestionJob,
   Job,
+  LocalModel,
+  LocalModelPrediction,
+  MLModel,
   Message,
+  ModelEvaluation,
   Page,
   PasswordResetOut,
   ProcessingOperation,
@@ -96,6 +101,11 @@ export const qk = {
   alerts: (params?: unknown) => ["disaster", "alerts", params ?? {}] as const,
   alert: (id: number | null) => ["disaster", "alerts", id] as const,
   forecasts: (params?: unknown) => ["disaster", "forecasts", params ?? {}] as const,
+  mlModels: (params?: unknown) => ["forecasts", "models", params ?? {}] as const,
+  modelEvaluations: (params?: unknown) => ["forecasts", "evaluations", params ?? {}] as const,
+  forecastRuns: (params?: unknown) => ["forecasts", "runs", params ?? {}] as const,
+  forecastStatus: ["forecasts", "status"] as const,
+  localModels: ["forecasts", "local-models"] as const,
 };
 
 // ---------------------------------------------------------------- users
@@ -747,5 +757,98 @@ export function useCreateForecast() {
       qc.invalidateQueries({ queryKey: ["disaster", "forecasts"] });
       qc.invalidateQueries({ queryKey: ["admin", "audit"] });
     },
+  });
+}
+
+// ---------------------------------------------------------------- ML forecasting (blocked validation, RMSE/MAE/bias)
+export function useMLModels(
+  params: {
+    indicator_key?: string;
+    study_area_id?: number;
+    active_only?: boolean;
+    page?: number;
+    size?: number;
+  } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: qk.mlModels(params),
+    queryFn: () => api.get<Page<MLModel>>("/forecasts/models", params),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useModelEvaluations(
+  params: {
+    model_id?: number;
+    indicator_key?: string;
+    study_area_id?: number;
+    page?: number;
+    size?: number;
+  } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: qk.modelEvaluations(params),
+    queryFn: () => api.get<Page<ModelEvaluation>>("/forecasts/evaluations", params),
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useForecastRuns(
+  params: {
+    indicator_key?: string;
+    study_area_id?: number;
+    status?: string;
+    page?: number;
+    size?: number;
+  } = {},
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: qk.forecastRuns(params),
+    queryFn: () => api.get<Page<ForecastRun>>("/forecasts/runs", params),
+    enabled,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useLocalModels() {
+  return useQuery({
+    queryKey: qk.localModels,
+    queryFn: () => api.get<LocalModel[]>("/forecasts/local-models"),
+    staleTime: 60_000,
+  });
+}
+
+export function usePredictLocalModel() {
+  return useMutation({
+    mutationFn: ({ modelKey, features }: { modelKey: string; features: Record<string, number> }) =>
+      api.post<LocalModelPrediction>(
+        `/forecasts/local-models/${encodeURIComponent(modelKey)}/predict`,
+        { features },
+      ),
+  });
+}
+
+export function useForecastStatus(enabled = true) {
+  return useQuery({
+    queryKey: qk.forecastStatus,
+    queryFn: () =>
+      api.get<{
+        enabled: boolean;
+        algorithms: string[];
+        sklearn_available: boolean;
+        xgboost_available: boolean;
+        horizon_days: number;
+        min_points: number;
+        n_folds: number;
+        interval: number;
+        active_models: number;
+      }>("/forecasts/status"),
+    enabled,
+    staleTime: 60_000,
   });
 }

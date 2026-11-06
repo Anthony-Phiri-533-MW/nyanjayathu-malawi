@@ -23,10 +23,13 @@ from app.schemas.ml import (
     ForecastRunOut,
     ForecastRunQueued,
     ForecastRunRequest,
+    LocalModelOut,
+    LocalModelPredictionOut,
+    LocalModelPredictionRequest,
     MLModelOut,
     ModelEvaluationOut,
 )
-from app.services import forecasting, scheduler as scheduler_service
+from app.services import forecasting, local_models, scheduler as scheduler_service
 from app.services.jobs import enqueue
 
 router = APIRouter(prefix="/forecasts", tags=["forecasting"])
@@ -184,3 +187,24 @@ def forecast_status(
         "active_models": len(models),
         "scheduler": scheduler_service.status(db),
     }
+
+
+@router.get("/local-models", response_model=list[LocalModelOut])
+def list_local_models(
+    _perms: Read,
+) -> list[dict]:
+    """Local model artifacts available for explicit-feature inference."""
+    return local_models.list_local_models()
+
+
+@router.post(
+    "/local-models/{model_key}/predict",
+    response_model=LocalModelPredictionOut,
+)
+def predict_local_model(
+    model_key: str,
+    payload: LocalModelPredictionRequest,
+    _perms: Run,
+) -> dict:
+    """Run a local model using caller-supplied values in its documented schema."""
+    return local_models.predict_local_model(model_key, payload.features)

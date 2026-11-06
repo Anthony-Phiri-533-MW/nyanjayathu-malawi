@@ -129,11 +129,23 @@ def compute_water_extent(ctx: IndicatorContext) -> list[IndicatorResult]:
             )
             continue
 
+        usable = valid & mask_result.valid_mask
+        if not usable.any():
+            results.append(
+                failed_result(
+                    ctx,
+                    reason="no valid pixels intersect the study-area boundary after raster and cloud masking",
+                    observed_start=start,
+                    observed_end=end,
+                    dataset=timeline.dataset,
+                )
+            )
+            continue
+
         areas = pixel_areas(ref)
-        water_pixels = mask_result.water_mask & valid & inside
+        water_pixels = mask_result.water_mask & usable & inside
         area_km2 = float((water_pixels * areas[:, None]).sum()) / 1_000_000.0
         extent_geojson = _water_extent_geometry(water_pixels, ref)
-        usable = valid & mask_result.valid_mask
         quality = quality_for(valid=usable, inside=inside, cloud_fraction=cloud_fraction)
 
         provenance = {

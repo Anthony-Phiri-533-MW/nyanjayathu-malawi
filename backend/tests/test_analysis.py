@@ -33,7 +33,7 @@ def _seed_results(study_area_id: int) -> None:
 def test_timeseries(client: TestClient, admin_headers: dict[str, str], default_study_area: dict) -> None:
     _seed_results(default_study_area["id"])
     response = client.get(
-        "/api/v1/analysis/timeseries",
+        "/api/v1/timeseries",
         params={
             "indicator_key": "water_extent",
             "study_area_id": default_study_area["id"],
@@ -53,7 +53,7 @@ def test_timeseries(client: TestClient, admin_headers: dict[str, str], default_s
 
     # monthly aggregation
     response = client.get(
-        "/api/v1/analysis/timeseries",
+        "/api/v1/timeseries",
         params={
             "indicator_key": "water_extent",
             "study_area_id": default_study_area["id"],
@@ -67,7 +67,7 @@ def test_timeseries(client: TestClient, admin_headers: dict[str, str], default_s
 def test_timeseries_validation(client: TestClient, admin_headers: dict[str, str], default_study_area: dict) -> None:
     # missing indicator key
     bad = client.get(
-        "/api/v1/analysis/timeseries",
+        "/api/v1/timeseries",
         params={"study_area_id": default_study_area["id"]},
         headers=admin_headers,
     )
@@ -75,19 +75,20 @@ def test_timeseries_validation(client: TestClient, admin_headers: dict[str, str]
 
     # indicator key too short
     bad = client.get(
-        "/api/v1/analysis/timeseries",
+        "/api/v1/timeseries",
         params={"indicator_key": "ab", "study_area_id": default_study_area["id"]},
         headers=admin_headers,
     )
     assert bad.status_code == 422
 
-    # unknown indicator key still returns a (possibly empty) series - service handles it
+    # unknown indicator key -> the service raises NotFoundError, which the
+    # error handlers map to 404 with the documented error shape
     response = client.get(
-        "/api/v1/analysis/timeseries",
+        "/api/v1/timeseries",
         params={"indicator_key": "not_an_indicator", "study_area_id": default_study_area["id"]},
         headers=admin_headers,
     )
-    assert response.status_code in (200, 422)
+    assert response.status_code == 404
 
 
 # --------------------------------------------------------------------- comparison
@@ -111,7 +112,7 @@ def test_compare_periods(client: TestClient, admin_headers: dict[str, str], defa
         )
 
     response = client.post(
-        "/api/v1/analysis/compare",
+        "/api/v1/compare",
         json={
             "study_area_id": default_study_area["id"],
             "indicator_keys": ["water_extent"],
@@ -133,7 +134,7 @@ def test_compare_periods(client: TestClient, admin_headers: dict[str, str], defa
 
     # inverted period
     bad = client.post(
-        "/api/v1/analysis/compare",
+        "/api/v1/compare",
         json={
             "study_area_id": default_study_area["id"],
             "indicator_keys": ["water_extent"],
@@ -147,7 +148,7 @@ def test_compare_periods(client: TestClient, admin_headers: dict[str, str], defa
 
     # bad aggregation
     bad = client.post(
-        "/api/v1/analysis/compare",
+        "/api/v1/compare",
         json={
             "study_area_id": default_study_area["id"],
             "indicator_keys": ["water_extent"],
