@@ -1,5 +1,7 @@
 # LakeWatch — Satellite & ML Lake Malawi Monitoring
 
+**AP19-H4WL-ZQ26** — baseline tag message, README header, every diagram footer, every hand-drawn sheet, the presentation title slide, proof video
+
 LakeWatch is a full-stack monitoring platform for **Lake Malawi** water level and
 water quality. This repository implements five of the planned modules end to end:
 
