@@ -1,5 +1,12 @@
 # Signature‑Challenge Gap Analysis
 
+> **Status: CLOSED (implemented).** All four properties are now proven by
+> automated tests in `backend/tests/test_signature_challenge.py` and by the
+> live demo `scripts/signature_demo.py`. The pure logic lives in
+> `backend/app/validation/` (`rmse.py`, `units.py`, `confusion.py`,
+> `cloudgap.py`). Evidence: TEST‑V1, TEST‑U1, TEST‑R1, TEST‑C1 (15 tests, all
+> green). Token AP19‑H4WL‑ZQ26.
+
 ## Property 1 – Validation against gauge records with RMSE
 
 | Aspect | As‑built system | Missing / Not yet | Evidence |
