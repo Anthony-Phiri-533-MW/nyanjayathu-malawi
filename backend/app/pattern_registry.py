@@ -32,10 +32,21 @@ def known_adapter_keys() -> list[str]:
 # ----------------------------------------------------------------------
 # Strategy registry – maps an index key to a concrete :class:`IndexStrategy`.
 # ----------------------------------------------------------------------
-from .strategies.index_strategy import IndexStrategy, MNDWI_Strategy
+from .strategies.index_strategy import (
+    IndexStrategy,
+    MNDWI_Strategy,
+    NdmiStrategy,
+    NdtiStrategy,
+    NdwiStrategy,
+    WriStrategy,
+)
 
 _STRATEGY_REGISTRY: Dict[str, IndexStrategy] = {
     "water_extent": MNDWI_Strategy(),
+    "water_extent_ndwi": NdwiStrategy(),
+    "moisture_index": NdmiStrategy(),
+    "turbidity_proxy": NdtiStrategy(),
+    "water_ratio": WriStrategy(),
 }
 
 def get_strategy(key: str) -> IndexStrategy:
