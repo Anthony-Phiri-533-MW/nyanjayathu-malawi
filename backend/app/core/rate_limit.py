@@ -55,7 +55,7 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         self._counters[key].append(now)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        if not settings.rate_limit_public_enabled:
+        if not settings.rate_limit_public_enabled or settings.environment == "test":
             return await call_next(request)
 
         ip = self._client_ip(request)

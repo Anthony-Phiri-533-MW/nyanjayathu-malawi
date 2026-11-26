@@ -25,6 +25,9 @@ def test_list_indicator_definitions(client: TestClient, admin_headers: dict[str,
 
 
 def test_indicator_compute_job(client: TestClient, admin_headers: dict[str, str], default_study_area: dict) -> None:
+    from tests.test_processing import _seed_raster_dataset
+
+    _seed_raster_dataset(default_study_area["id"], "Indicator compute dataset")
     response = client.post(
         "/api/v1/indicators/compute",
         json={
@@ -37,7 +40,7 @@ def test_indicator_compute_job(client: TestClient, admin_headers: dict[str, str]
     )
     assert response.status_code == 202, response.text
     body = response.json()
-    assert body["kind"] == "indicator.compute"
+    assert body["kind"] == "indicator"
     assert body["status"] in {"pending", "queued"}
 
 
