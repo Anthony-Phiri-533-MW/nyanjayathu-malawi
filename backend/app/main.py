@@ -12,13 +12,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine, session_scope
 from app.core.errors import install_error_handlers
-from app.models import Base
+from app.core.rate_limit import RateLimiterMiddleware
+from app.models import Base, Job
 from app.providers import close_http_client
 from app.services import handlers  # noqa: F401  (registers job handlers)
 from app.services.bootstrap import run_bootstrap
@@ -80,6 +81,7 @@ app.add_middleware(
 )
 
 install_error_handlers(app)
+app.add_middleware(RateLimiterMiddleware)
 app.include_router(api_router, prefix="/api/v1")
 
 
@@ -91,12 +93,23 @@ def health() -> dict:
             conn.execute(text("SELECT 1"))
     except Exception as exc:  # noqa: BLE001
         database = f"error: {type(exc).__name__}"
+    jobs_success_rate = None
+    try:
+        with session_scope() as db:
+            total = db.execute(select(func.count()).select_from(Job)).scalar_one()
+            succeeded = db.execute(
+                select(func.count()).select_from(Job).where(Job.status == "succeeded")
+            ).scalar_one()
+            jobs_success_rate = (succeeded / total) if total else 1.0
+    except Exception:  # noqa: BLE001
+        jobs_success_rate = None
     return {
         "status": "ok" if database == "ok" else "degraded",
         "environment": settings.environment,
         "database": database,
         "jobs_enabled": settings.jobs_enabled,
         "version": app.version,
+        "jobs_success_rate": jobs_success_rate,
     }
 
 

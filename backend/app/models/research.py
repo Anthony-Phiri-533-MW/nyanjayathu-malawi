@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, GeoJSONType, utcnow
@@ -206,6 +206,7 @@ class IndicatorResult(Base):
     # value is NULL when the indicator could not be computed - never coerced to 0
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     unit: Mapped[str] = mapped_column(String(40))
+    gap_interpolated: Mapped[bool] = mapped_column(Boolean, default=False)
     observed_start: Mapped[date] = mapped_column(Date, index=True)
     observed_end: Mapped[date] = mapped_column(Date, index=True)
     temporal_resolution: Mapped[str] = mapped_column(String(40), default="instant")
