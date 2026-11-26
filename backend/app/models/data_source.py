@@ -95,7 +95,7 @@ class Threshold(Base):
         lazy="selectin",
         cascade="all, delete-orphan",
         passive_deletes=True,
-        order_by="ThresholdVersion.version.desc()",
+        order_by="ThresholdVersion.version.asc()",
     )
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import csv
 import io
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -107,8 +107,9 @@ def test_periodic_monthly_report_builds(
         client, admin_headers, {"kind": "periodic", "period_type": "monthly", "format": "csv"}
     )
     assert report["status"] == "queued"
-    assert report["period_start"] == date.today().replace(day=1).isoformat()
-    assert report["period_end"] == date.today().isoformat()
+    today_utc = datetime.now(UTC).date()
+    assert report["period_start"] == today_utc.replace(day=1).isoformat()
+    assert report["period_end"] == today_utc.isoformat()
     finished = _run_report_job(client, admin_headers, report["id"])
     assert finished["status"] == "completed"
     assert finished["file_name"].endswith(".csv")

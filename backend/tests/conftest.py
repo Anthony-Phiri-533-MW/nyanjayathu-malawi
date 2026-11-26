@@ -31,7 +31,21 @@ from rasterio.transform import from_origin  # noqa: E402
 
 from app.cli import _bootstrap_admin  # noqa: E402
 from app.core.config import settings  # noqa: E402
+from app.core.database import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models import (  # noqa: E402
+    Alert,
+    AlertResponse,
+    Dataset,
+    ExportJob,
+    IndicatorResult,
+    IngestionJob,
+    Job,
+    Report,
+    StudyArea,
+    Threshold,
+    ThresholdVersion,
+)
 from app.processing.io import write_geotiff  # noqa: E402
 
 ADMIN_EMAIL = "admin@example.org"
@@ -78,6 +92,41 @@ def admin_headers(admin_token: str) -> dict[str, str]:
 
 
 # --------------------------------------------------------------- helpers
+@pytest.fixture
+def db_session(client):
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@pytest.fixture(autouse=True)
+def _clean_data_between_tests(db_session) -> None:
+    """Keep the session-scoped DB isolated between tests.
+
+    Users, roles, permissions, indicator definitions and the default study
+    area persist; everything else is wiped so tests do not leak state.
+    """
+    for model in (
+        IndicatorResult,
+        Dataset,
+        IngestionJob,
+        ThresholdVersion,
+        Threshold,
+        AlertResponse,
+        Alert,
+        Report,
+        ExportJob,
+        Job,
+    ):
+        db_session.query(model).delete()
+    db_session.query(StudyArea).filter(StudyArea.is_default.is_(False)).delete()
+    db_session.query(StudyArea).update({StudyArea.is_public: False})
+    db_session.commit()
+    yield
+
+
 @pytest.fixture
 def make_user(client: TestClient, admin_headers: dict[str, str]):
     """Create a user and return (user_dict, auth_headers)."""

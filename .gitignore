@@ -13,7 +13,7 @@ __pycache__/
 *.db-wal
 
 # Runtime storage (raw retrievals, exports, reports) is not source code
-data/
+/data/
 
 # --- Environment --------------------------------------------------------------
 .env

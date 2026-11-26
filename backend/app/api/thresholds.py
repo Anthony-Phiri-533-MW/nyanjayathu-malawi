@@ -26,6 +26,7 @@ def list_thresholds(
     search: str | None = None,
     category: str | None = None,
     approval_status: str | None = None,
+    operator: str | None = None,
     enabled: bool | None = None,
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=200),
@@ -35,6 +36,7 @@ def list_thresholds(
         search=search,
         category=category,
         approval_status=approval_status,
+        operator=operator,
         enabled=enabled,
         page=page,
         size=size,
@@ -100,3 +102,4 @@ def threshold_versions(
 ) -> list[ThresholdVersionOut]:
     row = service.get_threshold(db, threshold_id)
     return [threshold_version_out(v) for v in row.versions]
+
