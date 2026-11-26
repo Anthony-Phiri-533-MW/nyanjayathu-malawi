@@ -38,14 +38,14 @@ def test_study_area_crud(client: TestClient, admin_headers: dict[str, str]) -> N
     updated = client.patch(
         f"/api/v1/study-areas/{area['id']}",
         json={"name": "Renamed area", "description": "updated"},
-        headers=headers,
+        headers=admin_headers,
     ).json()
     assert updated["name"] == "Renamed area"
     assert updated["description"] == "updated"
 
-    deleted = client.delete(f"/api/v1/study-areas/{area['id']}", headers=headers)
+    deleted = client.delete(f"/api/v1/study-areas/{area['id']}", headers=admin_headers)
     assert deleted.status_code == 204
-    assert client.get(f"/api/v1/study-areas/{area['id']}", headers=headers).status_code == 404
+    assert client.get(f"/api/v1/study-areas/{area['id']}", headers=admin_headers).status_code == 404
 
 
 def test_study_area_validation(client: TestClient, admin_headers: dict[str, str]) -> None:
@@ -121,6 +121,7 @@ def test_researcher_can_read_but_not_write_study_areas(
     assert client.get("/api/v1/study-areas", headers=headers).status_code == 200
     assert client.post(
         "/api/v1/study-areas",
-        json={"name": "x", "description": "", "boundary_geojson": AOI},
+        json={"name": "Test area", "description": "", "boundary_geojson": AOI},
         headers=headers,
     ).status_code == 403
+

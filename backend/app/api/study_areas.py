@@ -19,7 +19,7 @@ from app.services.spatial import geom_bbox, parse_geojson_geometry
 router = APIRouter(prefix="/study-areas", tags=["research: study areas"])
 
 Read = Annotated[set[str], Depends(require_permissions("research.datasets.read"))]
-Write = Annotated[set[str], Depends(require_permissions("research.processing.run"))]
+Write = Annotated[set[str], Depends(require_permissions("research.study_areas.write"))]
 
 
 def _get(db: Session, area_id: int) -> StudyArea:
@@ -174,3 +174,4 @@ def delete_study_area(
         message=f"Deleted study area '{name}'",
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+

@@ -41,6 +41,7 @@ def list_thresholds(
     search: str | None = None,
     category: str | None = None,
     approval_status: str | None = None,
+    operator: str | None = None,
     enabled: bool | None = None,
     page: int = 1,
     size: int = 20,
@@ -60,6 +61,8 @@ def list_thresholds(
         )
     if approval_status:
         stmt = stmt.where(Threshold.approval_status == approval_status)
+    if operator:
+        stmt = stmt.where(Threshold.operator == operator)
     if enabled is not None:
         stmt = stmt.where(Threshold.is_enabled.is_(enabled))
     total = count_query(stmt, db)
@@ -198,3 +201,4 @@ def delete_threshold(db: Session, *, actor: User, t: Threshold) -> None:
         message=f"Deleted threshold for {info['indicator_key']}",
         details=info,
     )
+

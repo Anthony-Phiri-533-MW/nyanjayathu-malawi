@@ -26,6 +26,7 @@ PERMISSIONS: dict[str, tuple[str, str]] = {
     "admin.audit.read": ("View audit log entries", "admin"),
     # --- Research module --------------------------------------------------
     "research.datasets.read": ("Browse datasets and metadata", "research"),
+    "research.study_areas.write": ("Create, update, or delete study areas", "research"),
     "research.ingest.run": ("Launch data-ingestion jobs", "research"),
     "research.processing.run": ("Launch preprocessing / indicator-computation jobs", "research"),
     "research.indicators.read": ("View indicator definitions and results", "research"),
@@ -65,6 +66,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         "admin.scheduler.run",
         # administrators may inspect research outputs but do not need to run pipelines
         "research.datasets.read",
+        "research.study_areas.write",
         "research.indicators.read",
         "research.exports.create",
         "research.exports.download",
@@ -113,3 +115,4 @@ def permissions_for_roles(role_names: set[str]) -> set[str]:
 def role_grants(permission: str, role_names: set[str]) -> bool:
     perms = permissions_for_roles(role_names)
     return "*" in perms or permission in perms
+

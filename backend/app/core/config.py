@@ -79,6 +79,13 @@ class Settings(BaseSettings):
 
     # --- HTTP / providers -------------------------------------------------
     http_timeout_seconds: float = 30.0
+
+    # --- rate limiting ----------------------------------------------------
+    rate_limit_public_enabled: bool = True
+    rate_limit_public_requests: int = 60
+    rate_limit_public_window_seconds: int = 60
+    rate_limit_authenticated_requests: int = 300
+    rate_limit_authenticated_window_seconds: int = 60
     chirps_base_url: str = "https://data.chc.ucsb.edu/products/CHIRPS-2.0"
     nasa_power_base_url: str = "https://power.larc.nasa.gov/api"
     planetary_computer_stac_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
