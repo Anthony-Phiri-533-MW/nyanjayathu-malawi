@@ -164,6 +164,26 @@ same-origin by default (no CORS configuration needed for development).
 Other scripts: `npm run build` (type-check + production bundle),
 `npm run typecheck`, `npm run lint`, `npm run preview`.
 
+### 3.3 Git commit identity guard
+
+Commits must be authored and committed as the repository owner
+(`Anthony-Phiri-533-MW <anthonyphiri533@gmail.com>`). A tracked pre-commit hook
+in `.githooks/pre-commit` rejects any commit whose author or committer is a
+different identity (for example an AI coding agent such as `OpenCodeAgent`).
+
+Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Then set your identity:
+
+```bash
+git config user.name  "Anthony-Phiri-533-MW"
+git config user.email "anthonyphiri533@gmail.com"
+```
+
 ---
 
 ## 4. Environment variables

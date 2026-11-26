@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Identity guard for this repository.
+#
+# Every commit must be authored and committed as the repository owner. This
+# blocks AI coding agents (OpenCode, Cline, etc.) from recording themselves as
+# the author/committer, regardless of which tool performs the commit.
+#
+# Enable once per clone with:
+#     git config core.hooksPath .githooks
+#
+# If you legitimately use another identity, extend the case pattern below.
+
+set -eu
+
+check_ident() {
+    role="$1"
+    ident="$2"
+    case "$ident" in
+        "Anthony-Phiri-533-MW <anthonyphiri533@gmail.com>"*|\
+        "Anthony Phiri <anthony.phiri@nyanjayathu-malawi.mw>"*)
+            return 0
+            ;;
+    esac
+
+    echo "" >&2
+    echo "✗ Commit rejected: the $role identity is not allowed in this repository." >&2
+    echo "    got: $ident" >&2
+    echo "" >&2
+    echo "  Commits must be authored/committed as the repository owner." >&2
+    echo "  Fix it with:" >&2
+    echo "    git config user.name  \"Anthony-Phiri-533-MW\"" >&2
+    echo "    git config user.email \"anthonyphiri533@gmail.com\"" >&2
+    echo "" >&2
+    exit 1
+}
+
+check_ident "author"    "$(git var GIT_AUTHOR_IDENT)"
+check_ident "committer" "$(git var GIT_COMMITTER_IDENT)"
+
+exit 0
