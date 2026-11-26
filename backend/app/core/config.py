@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     rate_limit_public_window_seconds: int = 60
     rate_limit_authenticated_requests: int = 300
     rate_limit_authenticated_window_seconds: int = 60
-    chirps_base_url: str = "https://data.chc.ucsb.edu/products/CHIRPS-2.0"
+    chirps_base_url: str = "https://data.chc.ucsb.edu/products/CHIRPS/v2.0"
     nasa_power_base_url: str = "https://power.larc.nasa.gov/api"
     planetary_computer_stac_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
     planetary_computer_sas_url: str = "https://planetarycomputer.microsoft.com/api/sas/v1"

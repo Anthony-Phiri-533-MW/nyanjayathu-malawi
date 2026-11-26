@@ -15,6 +15,7 @@ from app.api import (
     forecasting,
     indicators,
     ingestion,
+    insights,
     jobs,
     processing,
     providers,
@@ -39,6 +40,7 @@ api_router.include_router(jobs.router)
 api_router.include_router(ingestion.router)
 api_router.include_router(processing.router)
 api_router.include_router(indicators.router)
+api_router.include_router(insights.router)
 api_router.include_router(analysis.router)
 api_router.include_router(assistant.router)
 api_router.include_router(exports.router)
