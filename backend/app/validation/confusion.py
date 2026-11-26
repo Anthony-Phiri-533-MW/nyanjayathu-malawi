@@ -10,7 +10,8 @@ confusion matrix.  These functions are pure and deterministic:
 """
 from __future__ import annotations
 
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 # documented comparison operators -> whether "above the reference" is the breach
 _OPERATORS = {"gt", "gte", "lt", "lte", "between"}

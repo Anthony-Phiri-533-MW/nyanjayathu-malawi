@@ -16,8 +16,9 @@ totally testable:
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, datetime
-from typing import Any, Mapping
+from typing import Any
 
 # multiplicative factor to convert each supported length unit into metres.
 _LENGTH_TO_METRES: dict[str, float] = {

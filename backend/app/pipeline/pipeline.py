@@ -7,9 +7,9 @@ list of steps and executes them sequentially.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
-
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
 StepFn = Callable[["PipelineContext"], "PipelineContext"]
 
@@ -35,13 +35,13 @@ class PipelineContext:
     error : str | None
         Human‑readable error message if a step fails.
     """
-    raw_data: Optional[bytes] = None
-    windowed_data: Optional[bytes] = None
-    calibrated: Optional[Dict[str, Any]] = None
-    indicator_result: Optional[Dict[str, Any]] = None
-    quality_flag: Optional[str] = None
-    alert: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
+    raw_data: bytes | None = None
+    windowed_data: bytes | None = None
+    calibrated: dict[str, Any] | None = None
+    indicator_result: dict[str, Any] | None = None
+    quality_flag: str | None = None
+    alert: dict[str, Any] | None = None
+    error: str | None = None
 
 
 class PipelineStep:
@@ -63,14 +63,14 @@ class PipelineStep:
 class Pipeline:
     """Ordered sequence of ``PipelineStep`` instances."""
 
-    def __init__(self, steps: Optional[List[PipelineStep]] = None) -> None:
-        self.steps: List[PipelineStep] = steps if steps is not None else []
+    def __init__(self, steps: list[PipelineStep] | None = None) -> None:
+        self.steps: list[PipelineStep] = steps if steps is not None else []
 
     def add(self, step: PipelineStep) -> None:
         self.steps.append(step)
 
-    def run(self, initial_ctx: PipelineContext = PipelineContext()) -> PipelineContext:
-        ctx = initial_ctx
+    def run(self, initial_ctx: PipelineContext | None = None) -> PipelineContext:
+        ctx = initial_ctx if initial_ctx is not None else PipelineContext()
         for step in self.steps:
             ctx = step.run(ctx)
             # Early‑exit if a fatal error occurred and the pipeline is not

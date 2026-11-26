@@ -15,7 +15,7 @@ pipeline.  ``parse_metadata`` always returns ``scale``, ``offset``, ``units``,
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 
 class SensorAdapter(ABC):
@@ -35,11 +35,11 @@ class SensorAdapter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse_metadata(self, data: bytes) -> Dict[str, Any]:
+    def parse_metadata(self, data: bytes) -> dict[str, Any]:
         """Extract sensor-specific calibration/provenance metadata."""
         raise NotImplementedError
 
-    def _meta(self, *, scale: float, offset: float, cloud_fraction: float) -> Dict[str, Any]:
+    def _meta(self, *, scale: float, offset: float, cloud_fraction: float) -> dict[str, Any]:
         return {
             "provider_key": self.provider_key,
             "scale": scale,

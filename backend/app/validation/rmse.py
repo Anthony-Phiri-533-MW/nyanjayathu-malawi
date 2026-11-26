@@ -11,7 +11,8 @@ unit-test without a database or rasters.
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 _EARTH_RADIUS_KM = 6371.0088
 
@@ -31,7 +32,7 @@ def rmse(predicted: Sequence[float], observed: Sequence[float]) -> float:
         raise ValueError("predicted and observed must have equal length")
     if not predicted:
         raise ValueError("cannot compute RMSE of empty sequences")
-    total = sum((float(p) - float(o)) ** 2 for p, o in zip(predicted, observed))
+    total = sum((float(p) - float(o)) ** 2 for p, o in zip(predicted, observed, strict=True))
     return math.sqrt(total / len(predicted))
 
 
@@ -41,7 +42,7 @@ def mae(predicted: Sequence[float], observed: Sequence[float]) -> float:
         raise ValueError("predicted and observed must have equal length")
     if not predicted:
         raise ValueError("cannot compute MAE of empty sequences")
-    return sum(abs(float(p) - float(o)) for p, o in zip(predicted, observed)) / len(predicted)
+    return sum(abs(float(p) - float(o)) for p, o in zip(predicted, observed, strict=True)) / len(predicted)
 
 
 def bias(predicted: Sequence[float], observed: Sequence[float]) -> float:
@@ -50,7 +51,7 @@ def bias(predicted: Sequence[float], observed: Sequence[float]) -> float:
         raise ValueError("predicted and observed must have equal length")
     if not predicted:
         raise ValueError("cannot compute bias of empty sequences")
-    return sum(float(p) - float(o) for p, o in zip(predicted, observed)) / len(predicted)
+    return sum(float(p) - float(o) for p, o in zip(predicted, observed, strict=True)) / len(predicted)
 
 
 def _nearest_gauge(point: Mapping[str, Any], gauges: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:

@@ -12,7 +12,7 @@ divide-by-zero pixels become NaN and are excluded from the reported mean.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 
@@ -39,10 +39,10 @@ class IndexStrategy(ABC):
         """Short catalogue key for this index."""
 
     @abstractmethod
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         """Compute the indicator value from a dict of reflectance bands."""
 
-    def _result(self, index: np.ndarray, procedure: str, sensor: str) -> Dict[str, Any]:
+    def _result(self, index: np.ndarray, procedure: str, sensor: str) -> dict[str, Any]:
         valid = index[~np.isnan(index)]
         if valid.size == 0:
             return {"value": None, "unit": "1", "quality_flag": "MISSING_DATA",
@@ -64,7 +64,7 @@ class MNDWI_Strategy(IndexStrategy):
     def key(self) -> str:
         return "water_extent"
 
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         idx = normalized_difference(_band(dataset, "green"), _band(dataset, "swir1"))
         return self._result(idx, "MNDWI", "S2_MPC")
 
@@ -76,7 +76,7 @@ class NdwiStrategy(IndexStrategy):
     def key(self) -> str:
         return "water_extent_ndwi"
 
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         idx = normalized_difference(_band(dataset, "green"), _band(dataset, "nir"))
         return self._result(idx, "NDWI", "S2_MPC")
 
@@ -88,7 +88,7 @@ class NdmiStrategy(IndexStrategy):
     def key(self) -> str:
         return "moisture_index"
 
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         idx = normalized_difference(_band(dataset, "nir"), _band(dataset, "swir1"))
         return self._result(idx, "NDMI", "S2_MPC")
 
@@ -100,7 +100,7 @@ class NdtiStrategy(IndexStrategy):
     def key(self) -> str:
         return "turbidity_proxy"
 
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         idx = normalized_difference(_band(dataset, "red"), _band(dataset, "green"))
         return self._result(idx, "NDTI", "S2_MPC")
 
@@ -112,7 +112,7 @@ class WriStrategy(IndexStrategy):
     def key(self) -> str:
         return "water_ratio"
 
-    def compute(self, dataset: Any) -> Dict[str, Any]:
+    def compute(self, dataset: Any) -> dict[str, Any]:
         g, r = _band(dataset, "green"), _band(dataset, "red")
         nir, swir1 = _band(dataset, "nir"), _band(dataset, "swir1")
         denom = g + r + nir + swir1
