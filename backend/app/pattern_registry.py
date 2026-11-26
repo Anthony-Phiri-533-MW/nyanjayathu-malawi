@@ -12,10 +12,23 @@ from typing import Dict, Any
 # ----------------------------------------------------------------------
 # Adapter registry – maps a provider key to a concrete :class:`SensorAdapter`.
 # ----------------------------------------------------------------------
-from .adapters import ChirpsAdapter, SensorAdapter
+from .adapters import (
+    ChirpsAdapter,
+    LandsatAdapter,
+    ModisAdapter,
+    NasaPowerAdapter,
+    SensorAdapter,
+    Sentinel2Adapter,
+    Sentinel3Adapter,
+)
 
 _ADAPTER_REGISTRY: Dict[str, SensorAdapter] = {
     "chirps": ChirpsAdapter(),
+    "nasa_power": NasaPowerAdapter(),
+    "modis": ModisAdapter(),
+    "landsat": LandsatAdapter(),
+    "sentinel2": Sentinel2Adapter(),
+    "sentinel3": Sentinel3Adapter(),
 }
 
 def get_adapter(key: str) -> SensorAdapter:
